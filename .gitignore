@@ -45,3 +45,6 @@ next-env.d.ts
 
 # configuración local de Claude Code
 /.claude/
+
+# Capturas locales
+Captura_de_pantalla_*.png
