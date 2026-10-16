@@ -15,7 +15,9 @@ import {
   type Rol,
   type UsuarioConMembresias,
 } from "@/lib/dominio/roles";
+import { registrarActividad } from "./actividad";
 import {
+  NOMBRE_ESTADO,
   ESTADOS_VIDEO,
   efectoAprobacion,
   validarTransicion,
@@ -225,6 +227,14 @@ export async function cambiarEstadoVideo(
   if (count === 0) {
     throw new TransicionInvalida("El video cambió mientras tanto. Recarga e inténtalo de nuevo.");
   }
+  await registrarActividad(db, {
+    canalId: video.canalId,
+    videoId: video.id,
+    userId: usuario.id,
+    accion: "estado_cambiado",
+    resumen: `${NOMBRE_ESTADO[video.estado]} → ${NOMBRE_ESTADO[hasta]}`,
+    detalle: { desde: video.estado, hasta },
+  });
   return db.video.findUniqueOrThrow({ where: { id: video.id } });
 }
 

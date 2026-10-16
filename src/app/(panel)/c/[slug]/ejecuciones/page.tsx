@@ -8,6 +8,7 @@ import { listarVideosDeCanal, obtenerCanalPorSlug } from "@/server/acceso";
 import { topeCanalAccion } from "@/server/acciones/produccion";
 import { listarEjecuciones } from "@/server/produccion";
 import { requireUsuario } from "@/server/sesion";
+import { listarActividad } from "@/server/actividad";
 
 const usd = (n: number) => `US$ ${n.toFixed(2)}`;
 
@@ -17,7 +18,11 @@ export default async function Ejecuciones({ params }: PageProps<"/c/[slug]/ejecu
   const canal = await obtenerCanalPorSlug(prisma, usuario, slug);
   if (!canal) notFound();
 
-  const [ejecuciones, videos] = await Promise.all([listarEjecuciones(prisma, usuario, canal.id), listarVideosDeCanal(prisma, usuario, canal.id)]);
+  const [ejecuciones, videos, actividad] = await Promise.all([
+    listarEjecuciones(prisma, usuario, canal.id),
+    listarVideosDeCanal(prisma, usuario, canal.id),
+    listarActividad(prisma, canal.id, undefined, 100),
+  ]);
   const edita = puede(usuario, canal.id, "editar_video");
   const admin = puede(usuario, canal.id, "configurar_canal");
   const tope = canal.limiteGastoVideo === null ? null : Number(canal.limiteGastoVideo);
@@ -86,6 +91,28 @@ export default async function Ejecuciones({ params }: PageProps<"/c/[slug]/ejecu
       )}
 
       <TablaEjecuciones slug={canal.slug} ejecuciones={ejecuciones} edita={edita} conVideo />
+
+      <div className="rounded-lg border border-borde bg-superficie p-4">
+        <h2 className="font-semibold">Registro de actividad</h2>
+        {actividad.length === 0 ? (
+          <p className="mt-2 text-sm text-suave">Sin actividad todavía.</p>
+        ) : (
+          <ul className="mt-2 space-y-1 text-sm">
+            {actividad.map((a) => (
+              <li key={a.id} className="flex flex-wrap gap-x-3">
+                <span className="text-suave tabular-nums">{a.creadoEn.toISOString().slice(0, 16).replace("T", " ")}</span>
+                {a.video && (
+                  <Link href={`/c/${canal.slug}/videos/${a.video.id}`} className="hover:text-acento hover:underline">
+                    {a.video.titulo}
+                  </Link>
+                )}
+                <span>{a.resumen}</span>
+                <span className="text-xs text-suave">{a.user?.email ?? "sistema"}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

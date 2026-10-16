@@ -3,11 +3,23 @@
 
 export type Fetch = typeof fetch;
 
-export const ALCANCES_GOOGLE = [
-  "https://www.googleapis.com/auth/youtube.readonly",
-  "https://www.googleapis.com/auth/yt-analytics.readonly",
-  "https://www.googleapis.com/auth/calendar.events",
-] as const;
+export const ALCANCE = {
+  /** Leer y actualizar videos del canal (programar con publishAt). Incluye lectura. */
+  youtube: "https://www.googleapis.com/auth/youtube",
+  analytics: "https://www.googleapis.com/auth/yt-analytics.readonly",
+  calendario: "https://www.googleapis.com/auth/calendar.events",
+  /** Solo archivos y carpetas que crea el propio panel: no ve el resto del Drive. */
+  drive: "https://www.googleapis.com/auth/drive.file",
+} as const;
+
+export const ALCANCES_GOOGLE = [ALCANCE.youtube, ALCANCE.analytics, ALCANCE.calendario, ALCANCE.drive] as const;
+
+/** Lectura de YouTube: vale el permiso completo o el antiguo de solo lectura. */
+export function tieneAlcance(concedidos: string, alcance: string): boolean {
+  const lista = concedidos.split(/\s+/);
+  if (lista.includes(alcance)) return true;
+  return alcance === "https://www.googleapis.com/auth/youtube.readonly" && lista.includes(ALCANCE.youtube);
+}
 
 export class ErrorGoogle extends Error {
   constructor(
@@ -178,6 +190,65 @@ export class Google {
     return salida;
   }
 
+  // ─────────── Drive (alcance drive.file) ───────────
+
+  async crearCarpeta(nombre: string, padre?: string | null): Promise<CarpetaODoc> {
+    return this.pedir("https://www.googleapis.com/drive/v3/files?fields=id,webViewLink", {
+      method: "POST",
+      body: JSON.stringify({ name: nombre, mimeType: "application/vnd.google-apps.folder", ...(padre ? { parents: [padre] } : {}) }),
+    });
+  }
+
+  /** Crea un Google Doc a partir de HTML (Drive lo convierte). */
+  async crearDocumento(nombre: string, html: string, padre: string): Promise<CarpetaODoc> {
+    const limite = "panel" + Math.random().toString(36).slice(2);
+    const cuerpo = [
+      `--${limite}`,
+      "Content-Type: application/json; charset=UTF-8",
+      "",
+      JSON.stringify({ name: nombre, mimeType: "application/vnd.google-apps.document", parents: [padre] }),
+      `--${limite}`,
+      "Content-Type: text/html; charset=UTF-8",
+      "",
+      html,
+      `--${limite}--`,
+      "",
+    ].join("\r\n");
+    return this.pedir("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", {
+      method: "POST",
+      headers: { "content-type": `multipart/related; boundary=${limite}` },
+      body: cuerpo,
+    });
+  }
+
+  /** Reemplaza el contenido de un Google Doc creado por el panel. */
+  async actualizarDocumento(id: string, html: string): Promise<CarpetaODoc> {
+    return this.pedir(
+      `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(id)}?uploadType=media&fields=id,webViewLink`,
+      { method: "PATCH", headers: { "content-type": "text/html; charset=UTF-8" }, body: html },
+    );
+  }
+
+  // ─────────── YouTube Data (alcance youtube) ───────────
+
+  async video(id: string): Promise<VideoYoutube | null> {
+    const r = await this.pedir<{ items?: VideoYoutube[] }>(
+      `https://www.googleapis.com/youtube/v3/videos?part=snippet,status&id=${encodeURIComponent(id)}`,
+    );
+    return r.items?.[0] ?? null;
+  }
+
+  /**
+   * Actualiza snippet y status. La API borra lo que no se envía, así que el
+   * llamador debe partir del video actual (ver programarVideo).
+   */
+  async actualizarVideo(cuerpo: { id: string; snippet: VideoYoutube["snippet"]; status: Partial<VideoYoutube["status"]> }): Promise<VideoYoutube> {
+    return this.pedir("https://www.googleapis.com/youtube/v3/videos?part=snippet,status", {
+      method: "PUT",
+      body: JSON.stringify(cuerpo),
+    });
+  }
+
   async eventos(calendario: string, desde: Date, hasta: Date): Promise<EventoGoogle[]> {
     const salida: EventoGoogle[] = [];
     let pagina: string | undefined;
@@ -220,6 +291,32 @@ export class Google {
     });
   }
 }
+
+export type CarpetaODoc = { id: string; webViewLink: string };
+
+export type VideoYoutube = {
+  id: string;
+  snippet: {
+    title: string;
+    description?: string;
+    tags?: string[];
+    categoryId: string;
+    channelId: string;
+    defaultLanguage?: string;
+    defaultAudioLanguage?: string;
+  };
+  status: {
+    uploadStatus?: string;
+    privacyStatus: "private" | "public" | "unlisted";
+    publishAt?: string;
+    license?: string;
+    embeddable?: boolean;
+    publicStatsViewable?: boolean;
+    madeForKids?: boolean;
+    selfDeclaredMadeForKids?: boolean;
+    containsSyntheticMedia?: boolean;
+  };
+};
 
 export type MetricasYoutube = {
   vistas: number | null;

@@ -13,6 +13,9 @@ import { fichaDeVideo } from "@/server/metricas";
 import { pedidoDeVideo, piezasDeCanal, produccionDeVideo } from "@/server/produccion";
 import { ProduccionVideo } from "@/components/produccion-video";
 import { objetivoGancho } from "@/lib/puntaje/gancho";
+import { PublicacionVideo } from "@/components/publicacion-video";
+import { estadoParaProgramar, fichaPublicacionDeVideo, guiaTiktok } from "@/server/publicacion";
+import { listarActividad } from "@/server/actividad";
 import { requireUsuario } from "@/server/sesion";
 
 const FUENTE: Record<string, string> = { youtube_api: "YouTube API", csv: "CSV", manual: "Manual" };
@@ -26,7 +29,13 @@ export default async function FichaVideo({ params }: PageProps<"/c/[slug]/videos
   if (!video) notFound();
 
   const edita = puede(usuario, canal.id, "editar_video");
-  const prod = await produccionDeVideo(prisma, usuario, canal.id, video.id);
+  const [prod, fichaPub, programar, tiktok, actividad] = await Promise.all([
+    produccionDeVideo(prisma, usuario, canal.id, video.id),
+    fichaPublicacionDeVideo(prisma, usuario, canal.id, video.id),
+    estadoParaProgramar(prisma, usuario, canal.id, video.id),
+    guiaTiktok(prisma, usuario, canal.id, video.id),
+    listarActividad(prisma, canal.id, video.id, 50),
+  ]);
   const hoy = fechaLocal(new Date(), canal.zonaHoraria);
   const n = (v: number | null | undefined, dec = 0) =>
     v === null || v === undefined ? "—" : new Intl.NumberFormat(canal.idioma, { maximumFractionDigits: dec }).format(v);
@@ -89,6 +98,19 @@ export default async function FichaVideo({ params }: PageProps<"/c/[slug]/videos
         pedido={pedidoDeVideo({ ...video, canal })}
         video={{ ...video, limiteGasto: video.limiteGasto === null ? null : Number(video.limiteGasto) }}
         {...prod}
+      />
+
+      <PublicacionVideo
+        slug={canal.slug}
+        canal={canal}
+        permisos={{ edita, publica: puede(usuario, canal.id, "publicar") }}
+        video={programar.v}
+        ficha={fichaPub.ficha}
+        fichaGuardada={fichaPub.guardada}
+        revision={fichaPub.revision}
+        programar={{ motivos: programar.motivos, publishAt: programar.publishAt, urlYoutube: programar.pub?.url ?? null, aprobador: programar.aprobador }}
+        tiktok={tiktok}
+        actividad={actividad}
       />
 
       <div>

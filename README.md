@@ -8,7 +8,7 @@ Plan completo por fases: [`docs/PLAN_PANEL_CANALES.pdf`](docs/PLAN_PANEL_CANALES
 
 ## Estado
 
-**Fases 0, 1, 2 y 3** hechas. Desplegado en el dominio provisional de Hostinger.
+**Fases 0 a 4** hechas. Desplegado en el dominio provisional de Hostinger.
 
 | Entregable | Estado |
 |---|---|
@@ -40,7 +40,14 @@ Plan completo por fases: [`docs/PLAN_PANEL_CANALES.pdf`](docs/PLAN_PANEL_CANALES
 | Tope de gasto por video (del canal, o propio del video) | ✅ |
 | «Marcar salida lista» con los enlaces de Drive de largo, TikToks y Shorts | ✅ |
 
-Pendiente para fases siguientes: arrastrar y soltar en el tablero y registro de actividad.
+| **Fase 4 · Publicación** | |
+| Carpeta por video en Google Drive y ficha de publicación (Google Doc) para YouTube y TikTok | ✅ (requiere Google conectado con Drive) |
+| Programación en YouTube con `publishAt` a la hora del canal, solo con el video «aprobado» y firmado por revisor o admin | ✅ (requiere Google conectado) |
+| TikTok manual guiado: checklist, textos listos para copiar por parte y registro de la URL | ✅ |
+| Aviso por correo al equipo al programar y al publicar | ✅ (requiere SMTP) |
+| Confirmación explícita en pantalla y registro de actividad en cada paso que publica | ✅ |
+
+Pendiente para fases siguientes: arrastrar y soltar en el tablero.
 
 ## Datos y estadísticas (Fase 2)
 
@@ -71,9 +78,29 @@ En la ficha de cada video:
 - **Ejecuciones.** Cada tarea externa (voz con ElevenLabs, imágenes, subtítulos, render de Remotion en la PC) se registra con estado, costo, enlace de salida y log. Hay una vista por video y un panel por canal, en **Ejecuciones**. Lo que supere el tope de gasto del video no se registra: un admin puede subir el tope del canal o el de ese video.
 - **Marcar salida lista.** Con el video en Producción, se pegan los enlaces de Google Drive de cada pieza. Cuántas piezas lleva cada video sale de `reglas.piezasPorVideo` (en el canal #1: 1 largo, 4 TikToks y 3 Shorts). Se guardan como activos versionados, se registra una ejecución con log y costo, y si se marca la casilla el video pasa a Revisión.
 
+## Publicación (Fase 4)
+
+Todo paso que publica muestra en pantalla qué va a pasar y exige marcar «Confirmo…» antes de habilitar el botón; el servidor vuelve a exigir esa confirmación. Cada paso queda en el **registro de actividad**, visible en la ficha del video y en Ejecuciones, junto con los cambios de estado y los avisos al equipo.
+
+- **Ficha de publicación.** En la ficha del video se edita lo que va a YouTube (título, descripción, etiquetas, comentario fijado) y a TikTok (descripción, hashtags, comentario fijado). El borrador sale de los datos del video, las fuentes verificadas y los textos fijos del canal en `reglas.ficha` (`avisoLegal`, `etiquetaIA`, `hashtagsFijos`, `cierreTiktok`, `checklistTiktok`, `contenidoSintetico`).
+  - **TikTok no admite enlaces** en la descripción ni en el comentario: se rechaza al guardar. El enlace al video largo va solo en la bio.
+  - Las fuentes, el aviso legal y la cantidad de hashtags se revisan como avisos.
+- **Drive.** «Crear carpeta y ficha en Drive» crea la carpeta raíz del canal (`<canal> · Panel`), una carpeta por video (`<fecha> · <título>`) y la ficha como Google Doc, con los textos de YouTube, cada parte de TikTok, el checklist y los enlaces de los archivos. Usa el permiso `drive.file`, así que el panel solo ve lo que él mismo crea. Volver a generarla actualiza el mismo documento.
+- **Programar en YouTube** (solo admin). El video se sube a YouTube Studio como **privado** y su enlace se registra en Publicaciones. Para programar hace falta:
+  - el video en «Aprobado», con la firma de un revisor o admin del canal (se comprueba el rol de quien firmó);
+  - la ficha en Drive;
+  - una fecha al menos 15 minutos en el futuro.
+
+  El panel actualiza en YouTube título, descripción y etiquetas, y fija `publishAt` a la hora de publicación del canal (12:00 America/Bogota en el canal #1), en la fecha del video o en otra elegida. Como `videos.update` borra los campos que no se envían, el panel parte del video actual y conserva categoría, idioma, licencia y demás. YouTube solo permite `publishAt` en videos privados que nunca se publicaron, y el panel lo verifica antes. El video pasa a «Programado» y se avisa al equipo.
+- **TikTok manual guiado.** Con el video aprobado, cada parte (`PARTE n/N`) trae descripción y comentario con botón «Copiar» y el checklist del canal. El registro de la URL publicada se habilita al completar el checklist y pide confirmación. Queda como publicación de TikTok y se avisa al equipo.
+- **Marcar publicado** (solo admin). Cuando llega la hora programada se confirma en pantalla, el video pasa a «Publicado» y se avisa al equipo.
+- **Avisos al equipo.** Correo con copia oculta a todos los miembros activos del canal, por el mismo SMTP del login. Si falla, el paso no se revierte y la falla queda en la actividad.
+
+> **Permisos de Google:** desde esta fase la conexión pide además `youtube` (gestión) y `drive.file`. Un canal conectado antes debe **volver a conectar Google** en Integraciones. Si el proyecto de Google Cloud no está verificado, Google puede limitar lo que la API hace con los videos; en ese caso hay que pasar la verificación de la app.
+
 ### Conectar Google (YouTube + Calendar)
 
-1. En [Google Cloud Console](https://console.cloud.google.com/), crea un proyecto y activa **YouTube Data API v3**, **YouTube Analytics API** y **Google Calendar API**.
+1. En [Google Cloud Console](https://console.cloud.google.com/), crea un proyecto y activa **YouTube Data API v3**, **YouTube Analytics API**, **Google Calendar API** y **Google Drive API**.
 2. Configura la pantalla de consentimiento (tipo *Externo*) y añade como usuarios de prueba las cuentas que conectarán canales. Mientras la app esté en modo *Testing*, Google vence el permiso a los 7 días y hay que reconectar; para evitarlo, publica la app.
 3. Crea credenciales **ID de cliente OAuth → Aplicación web**, con la URI de redirección `https://<dominio>/api/integraciones/google/callback`.
 4. En las variables del sitio, añade `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `INTEGRACIONES_CLAVE` y `CRON_SECRET` desde hPanel. No uses el reemplazo por API, que borra las demás.

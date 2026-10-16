@@ -45,7 +45,16 @@
       "Pregunta para los comentarios.",
       "Adelanto del próximo video."
     ],
-    "extensionGuion": "1000 a 1400 palabras (unas 150 por minuto)"
+    "extensionGuion": "1000 a 1400 palabras (unas 150 por minuto)",
+    "ficha": {
+      "avisoLegal": "Contenido informativo y educativo. No es asesoría financiera ni promueve actividades ilegales.",
+      "etiquetaIA": "Este video usa voz e ilustraciones generadas con inteligencia artificial.",
+      "hashtagsFijos": [
+        "#DineroOculto"
+      ],
+      "cierreTiktok": "Video completo en YouTube: el enlace está en la bio.",
+      "contenidoSintetico": false
+    }
   },
   "limiteGastoVideo": null,
   "agenda": "docs/AGENDA_PUBLICACION_10_VIDEOS.md",

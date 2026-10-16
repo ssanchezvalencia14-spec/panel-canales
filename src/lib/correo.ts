@@ -73,3 +73,23 @@ export async function enviarEnlaceDeAcceso(params: { para: string; url: string; 
     throw new Error(`No se pudo enviar el correo a: ${rechazados.join(", ")}`);
   }
 }
+
+/** Correo simple a varios destinatarios (avisos al equipo). En desarrollo sin SMTP, a la consola. */
+export async function enviarCorreo(params: { para: string[]; asunto: string; texto: string }) {
+  if (params.para.length === 0) return { enviados: 0 };
+  const smtp = configSmtp();
+  if (!smtp) {
+    if (process.env.NODE_ENV === "production") throw new Error("Falta configurar SMTP_HOST para enviar avisos.");
+    console.info(`\n[correo de desarrollo] Para: ${params.para.join(", ")}\nAsunto: ${params.asunto}\n${params.texto}\n`);
+    return { enviados: params.para.length };
+  }
+  const info = await createTransport(smtp).sendMail({
+    from: remitente(),
+    // Cada persona ve solo su dirección.
+    to: remitente(),
+    bcc: params.para,
+    subject: params.asunto,
+    text: params.texto,
+  });
+  return { enviados: params.para.length - (info.rejected?.length ?? 0) };
+}

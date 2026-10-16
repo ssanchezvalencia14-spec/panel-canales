@@ -13,7 +13,7 @@ const ERRORES: Record<string, string> = {
   "sin-config": "Falta configurar GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en el servidor.",
   cancelado: "La conexión se canceló en Google.",
   "sin-refresh": "Google no entregó un permiso permanente. Quita el acceso del panel en tu cuenta de Google y vuelve a conectar.",
-  permisos: "Faltan permisos: hay que aceptar YouTube (lectura y analíticas) y Calendar.",
+  permisos: "Faltan permisos: hay que aceptar YouTube (gestión y analíticas), Calendar y Drive.",
   google: "Google rechazó la conexión. Inténtalo de nuevo en unos minutos.",
 };
 
@@ -45,7 +45,7 @@ export default async function Integraciones({ params, searchParams }: PageProps<
         <p className="text-suave">
           Con Google conectado, el panel trae de YouTube Analytics las vistas, la retención, los likes, comentarios,
           compartidos y suscriptores de cada video, y escribe en Google Calendar las fechas de publicación y producción,
-          además de leer las reuniones del calendario. El CTR de impresiones no está en la API de YouTube: se carga con el
+          además de leer las reuniones del calendario. Con el permiso de Drive crea la carpeta y la ficha de cada video, y con el de YouTube programa la publicación. El CTR de impresiones no está en la API de YouTube: se carga con el
           CSV de YouTube Studio.
         </p>
 

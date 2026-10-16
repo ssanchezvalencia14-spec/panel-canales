@@ -79,6 +79,7 @@ model User {
   ganchosForzados Video[]       @relation("VideoGanchoForzadoPor")
   ejecuciones     Ejecucion[]   @relation("EjecucionRegistradaPor")
   guiones         Guion[]       @relation("GuionCreadoPor")
+  actividad       Actividad[]
 
   @@map("users")
 }
@@ -172,6 +173,7 @@ model Canal {
   integraciones Integracion[]
   eventos       EventoCalendario[]
   guiones       Guion[]
+  actividad     Actividad[]
 
   @@map("canales")
 }
@@ -179,33 +181,43 @@ model Canal {
 // ─────────────────────────── Contenido ───────────────────────────
 
 model Video {
-  id                 String      @id @default(cuid())
-  canalId            String      @map("canal_id")
-  titulo             String      @db.VarChar(300)
-  pilar              String?
-  fechaPublicacion   DateTime?   @map("fecha_publicacion")
-  estado             EstadoVideo @default(idea)
-  gancho             String?     @db.Text
-  scoreGancho        Float?      @map("score_gancho")
+  id                    String      @id @default(cuid())
+  canalId               String      @map("canal_id")
+  titulo                String      @db.VarChar(300)
+  pilar                 String?
+  fechaPublicacion      DateTime?   @map("fecha_publicacion")
+  estado                EstadoVideo @default(idea)
+  gancho                String?     @db.Text
+  scoreGancho           Float?      @map("score_gancho")
   /// Desglose del puntaje del gancho (propiedades y sugerencias).
-  puntajeGancho      Json?       @map("puntaje_gancho")
+  puntajeGancho         Json?       @map("puntaje_gancho")
   /// Texto de la miniatura (≤ 3 palabras, distinto del título).
-  textoMiniatura     String?     @map("texto_miniatura") @db.VarChar(120)
+  textoMiniatura        String?     @map("texto_miniatura") @db.VarChar(120)
   /// Revisión del título: banderas como sin-cifra, móvil, largo.
-  revisionTitulo     Json?       @map("revision_titulo")
+  revisionTitulo        Json?       @map("revision_titulo")
   /// Un admin puede dejar avanzar un video con gancho bajo el objetivo.
-  ganchoForzadoPorId String?     @map("gancho_forzado_por_id")
-  ganchoForzadoEn    DateTime?   @map("gancho_forzado_en")
+  ganchoForzadoPorId    String?     @map("gancho_forzado_por_id")
+  ganchoForzadoEn       DateTime?   @map("gancho_forzado_en")
   /// Tope de gasto de IA propio del video (USD); si es null rige el del canal.
-  limiteGasto        Decimal?    @map("limite_gasto") @db.Decimal(10, 2)
-  fuentesOk          Boolean     @default(false) @map("fuentes_ok")
-  notas              String?     @db.Text
+  limiteGasto           Decimal?    @map("limite_gasto") @db.Decimal(10, 2)
+  fuentesOk             Boolean     @default(false) @map("fuentes_ok")
+  notas                 String?     @db.Text
   /// Firma de aprobación humana: quién aprobó y cuándo.
-  aprobadoPorId      String?     @map("aprobado_por_id")
-  aprobadoEn         DateTime?   @map("aprobado_en")
-  creadoEn           DateTime    @default(now()) @map("creado_en")
-  actualizadoEn      DateTime    @updatedAt @map("actualizado_en")
+  aprobadoPorId         String?     @map("aprobado_por_id")
+  aprobadoEn            DateTime?   @map("aprobado_en")
+  /// Ficha de publicación (YouTube y TikTok) editada en el panel.
+  fichaPublicacion      Json?       @map("ficha_publicacion")
+  /// Carpeta del video en Google Drive y documento de la ficha (creados por el panel).
+  driveCarpetaId        String?     @map("drive_carpeta_id") @db.VarChar(128)
+  driveCarpetaUrl       String?     @map("drive_carpeta_url") @db.Text
+  fichaDriveId          String?     @map("ficha_drive_id") @db.VarChar(128)
+  fichaDriveUrl         String?     @map("ficha_drive_url") @db.Text
+  /// Momento programado en YouTube (publishAt) cuando el panel lo programó.
+  youtubeProgramadoPara DateTime?   @map("youtube_programado_para")
+  creadoEn              DateTime    @default(now()) @map("creado_en")
+  actualizadoEn         DateTime    @updatedAt @map("actualizado_en")
 
+  actividad        Actividad[]
   canal            Canal              @relation(fields: [canalId], references: [id], onDelete: Cascade)
   aprobadoPor      User?              @relation("VideoAprobadoPor", fields: [aprobadoPorId], references: [id], onDelete: SetNull)
   ganchoForzadoPor User?              @relation("VideoGanchoForzadoPor", fields: [ganchoForzadoPorId], references: [id], onDelete: SetNull)
@@ -334,6 +346,8 @@ model Integracion {
   cuenta               String?
   youtubeCanalId       String?              @map("youtube_canal_id") @db.VarChar(64)
   calendarioId         String               @default("primary") @map("calendario_id")
+  /// Carpeta raíz del canal en Drive (la crea el panel la primera vez).
+  driveCarpetaId       String?              @map("drive_carpeta_id") @db.VarChar(128)
   refreshTokenCifrado  String               @map("refresh_token_cifrado") @db.Text
   alcances             String               @db.Text
   conectadoPorId       String?              @map("conectado_por_id")
@@ -425,4 +439,26 @@ model Guion {
   @@unique([videoId, version])
   @@index([canalId, videoId])
   @@map("guiones")
+}
+
+/// Registro de actividad: quién hizo qué y cuándo. Todo paso que publica
+/// (programar en YouTube, registrar un TikTok, marcar publicado) queda aquí.
+model Actividad {
+  id       String   @id @default(cuid())
+  canalId  String   @map("canal_id")
+  videoId  String?  @map("video_id")
+  userId   String?  @map("user_id")
+  /// p. ej. estado_cambiado, drive_ficha, youtube_programado, tiktok_publicado
+  accion   String   @db.VarChar(40)
+  resumen  String   @db.VarChar(500)
+  detalle  Json?
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  canal Canal  @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  video Video? @relation(fields: [canalId, videoId], references: [canalId, id], onDelete: Cascade)
+  user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([canalId, creadoEn])
+  @@index([canalId, videoId])
+  @@map("actividad")
 }
