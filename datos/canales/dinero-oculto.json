@@ -1,0 +1,21 @@
+{
+  "slug": "dinero-oculto",
+  "nombre": "Dinero Oculto",
+  "idioma": "es",
+  "zonaHoraria": "America/Bogota",
+  "horaPublicacion": "12:00",
+  "diasPublicacion": ["lun", "mie", "vie"],
+  "colorAcento": "#E9B949",
+  "pilares": [
+    "Finanzas sencillas",
+    "Cómo funcionan empresas y negocios",
+    "Fortunas"
+  ],
+  "reglas": {
+    "videosPorSemana": 3,
+    "piezasPorVideo": { "largo": 1, "tiktok": 4, "shorts": 3 },
+    "formatoVertical": "1080x1920",
+    "diasProduccionAntes": 3
+  },
+  "limiteGastoVideo": null
+}

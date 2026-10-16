@@ -1,0 +1,301 @@
+// Esquema de la plataforma multicanal.
+//
+// Regla de aislamiento: toda tabla con datos de contenido lleva `canal_id`.
+// Las tablas hijas de un video referencian (canal_id, video_id) con una
+// clave foránea compuesta, así la base de datos impide que una tarea, activo
+// o publicación quede colgada de un video de otro canal.
+//
+// Nada específico de un canal (marca, horario, pilares, reglas) vive aquí:
+// son columnas de `canales` que se llenan con datos.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ─────────────────────────── Enumeraciones ───────────────────────────
+
+enum Rol {
+  admin
+  productor
+  revisor
+  lector
+}
+
+enum EstadoVideo {
+  idea
+  guion
+  verificacion
+  produccion
+  revision
+  aprobado
+  programado
+  publicado
+}
+
+enum EstadoTarea {
+  pendiente
+  en_curso
+  hecha
+  bloqueada
+}
+
+enum Plataforma {
+  youtube
+  youtube_shorts
+  tiktok
+}
+
+enum EstadoEjecucion {
+  en_cola
+  en_curso
+  ok
+  error
+}
+
+// ─────────────────────────── Usuarios y acceso ───────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?   @map("nombre")
+  emailVerified DateTime? @map("email_verificado")
+  image         String?   @map("imagen") @db.Text
+  esSuperadmin  Boolean   @default(false) @map("es_superadmin")
+  activo        Boolean   @default(true)
+  creadoEn      DateTime  @default(now()) @map("creado_en")
+  actualizadoEn DateTime  @updatedAt @map("actualizado_en")
+
+  accounts        Account[]
+  sessions        Session[]
+  membresias      Membresia[]
+  videosAprobados Video[]     @relation("VideoAprobadoPor")
+  tareasAsignadas Tarea[]     @relation("TareaResponsable")
+
+  @@map("users")
+}
+
+model Membresia {
+  userId   String   @map("user_id")
+  canalId  String   @map("canal_id")
+  rol      Rol
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canal Canal @relation(fields: [canalId], references: [id], onDelete: Cascade)
+
+  @@id([userId, canalId])
+  @@index([canalId])
+  @@map("membresias")
+}
+
+// Tablas de Auth.js (adaptador de Prisma). Los nombres de campo los fija la librería.
+model Account {
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─────────────────────────── Canales ───────────────────────────
+
+model Canal {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  nombre           String
+  idioma           String   @default("es")
+  zonaHoraria      String   @map("zona_horaria")
+  /// Hora local de publicación, "HH:mm", en la zona horaria del canal.
+  horaPublicacion  String   @map("hora_publicacion") @db.VarChar(5)
+  /// Días de publicación, p. ej. ["lun","mie","vie"].
+  diasPublicacion  Json     @map("dias_publicacion")
+  /// Color de acento en hexadecimal (#RRGGBB).
+  colorAcento      String   @map("color_acento") @db.VarChar(7)
+  /// Lista de pilares de contenido del canal.
+  pilares          Json
+  /// Reglas operativas del canal (formatos por video, días de producción, etc.).
+  reglas           Json
+  /// Tope de gasto en créditos de IA por video, en USD. Null = sin tope definido.
+  limiteGastoVideo Decimal? @map("limite_gasto_video") @db.Decimal(10, 2)
+  activo           Boolean  @default(true)
+  creadoEn         DateTime @default(now()) @map("creado_en")
+  actualizadoEn    DateTime @updatedAt @map("actualizado_en")
+
+  membresias    Membresia[]
+  videos        Video[]
+  tareas        Tarea[]
+  activos       Activo[]
+  publicaciones Publicacion[]
+  metricas      Metrica[]
+  ejecuciones   Ejecucion[]
+
+  @@map("canales")
+}
+
+// ─────────────────────────── Contenido ───────────────────────────
+
+model Video {
+  id               String      @id @default(cuid())
+  canalId          String      @map("canal_id")
+  titulo           String      @db.VarChar(300)
+  pilar            String?
+  fechaPublicacion DateTime?   @map("fecha_publicacion")
+  estado           EstadoVideo @default(idea)
+  gancho           String?     @db.Text
+  scoreGancho      Float?      @map("score_gancho")
+  fuentesOk        Boolean     @default(false) @map("fuentes_ok")
+  notas            String?     @db.Text
+  /// Firma de aprobación humana: quién aprobó y cuándo.
+  aprobadoPorId    String?     @map("aprobado_por_id")
+  aprobadoEn       DateTime?   @map("aprobado_en")
+  creadoEn         DateTime    @default(now()) @map("creado_en")
+  actualizadoEn    DateTime    @updatedAt @map("actualizado_en")
+
+  canal         Canal         @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  aprobadoPor   User?         @relation("VideoAprobadoPor", fields: [aprobadoPorId], references: [id], onDelete: SetNull)
+  tareas        Tarea[]
+  activos       Activo[]
+  publicaciones Publicacion[]
+  ejecuciones   Ejecucion[]
+
+  @@unique([canalId, id])
+  @@index([canalId, fechaPublicacion])
+  @@index([canalId, estado])
+  @@map("videos")
+}
+
+model Tarea {
+  id            String      @id @default(cuid())
+  canalId       String      @map("canal_id")
+  videoId       String      @map("video_id")
+  tipo          String
+  descripcion   String?     @db.Text
+  responsableId String?     @map("responsable_id")
+  estado        EstadoTarea @default(pendiente)
+  /// Fuente obligatoria para cerrar tareas de verificación de cifras.
+  fuenteUrl     String?     @map("fuente_url") @db.Text
+  vence         DateTime?
+  creadoEn      DateTime    @default(now()) @map("creado_en")
+  actualizadoEn DateTime    @updatedAt @map("actualizado_en")
+
+  canal       Canal @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  video       Video @relation(fields: [canalId, videoId], references: [canalId, id], onDelete: Cascade)
+  responsable User? @relation("TareaResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+
+  @@index([canalId, estado])
+  @@index([canalId, videoId])
+  @@map("tareas")
+}
+
+model Activo {
+  id       String   @id @default(cuid())
+  canalId  String   @map("canal_id")
+  videoId  String   @map("video_id")
+  tipo     String
+  /// Enlace al archivo (Drive u otro). El panel guarda enlaces, no archivos.
+  url      String   @db.Text
+  version  Int      @default(1)
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  canal Canal @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  video Video @relation(fields: [canalId, videoId], references: [canalId, id], onDelete: Cascade)
+
+  @@index([canalId, videoId])
+  @@map("activos")
+}
+
+model Publicacion {
+  id         String     @id @default(cuid())
+  canalId    String     @map("canal_id")
+  videoId    String     @map("video_id")
+  plataforma Plataforma
+  url        String?    @db.Text
+  programada DateTime?
+  publicada  DateTime?
+  creadoEn   DateTime   @default(now()) @map("creado_en")
+
+  canal    Canal     @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  video    Video     @relation(fields: [canalId, videoId], references: [canalId, id], onDelete: Cascade)
+  metricas Metrica[]
+
+  @@unique([canalId, id])
+  @@index([canalId, videoId])
+  @@map("publicaciones")
+}
+
+model Metrica {
+  id            String   @id @default(cuid())
+  canalId       String   @map("canal_id")
+  publicacionId String   @map("publicacion_id")
+  fecha         DateTime @db.Date
+  vistas        Int?
+  /// Retención media en porcentaje (0-100).
+  retencion     Float?
+  /// CTR de impresiones en porcentaje (0-100).
+  ctr           Float?
+  likes         Int?
+  comentarios   Int?
+
+  canal       Canal       @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  publicacion Publicacion @relation(fields: [canalId, publicacionId], references: [canalId, id], onDelete: Cascade)
+
+  @@unique([publicacionId, fecha])
+  @@index([canalId, fecha])
+  @@map("metricas")
+}
+
+model Ejecucion {
+  id            String          @id @default(cuid())
+  canalId       String          @map("canal_id")
+  videoId       String?         @map("video_id")
+  tipo          String
+  estado        EstadoEjecucion @default(en_cola)
+  log           String?         @db.LongText
+  /// Costo en USD de la ejecución (créditos de IA, etc.).
+  costo         Decimal?        @db.Decimal(10, 4)
+  creadoEn      DateTime        @default(now()) @map("creado_en")
+  actualizadoEn DateTime        @updatedAt @map("actualizado_en")
+
+  canal Canal  @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  video Video? @relation(fields: [canalId, videoId], references: [canalId, id], onDelete: Cascade)
+
+  @@index([canalId, estado])
+  @@map("ejecuciones")
+}
