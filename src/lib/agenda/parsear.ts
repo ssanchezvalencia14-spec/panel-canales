@@ -11,6 +11,7 @@ export type EntradaAgenda = {
   titulo: string;
   pilar: string | null;
   gancho: string | null;
+  notas: string | null;
 };
 
 export type ResultadoAgenda = {
@@ -79,7 +80,7 @@ export function parsearFecha(texto: string, anioPorDefecto?: number): string | n
     return anio ? fechaValida(anio, +m[2], +m[1]) : null;
   }
 
-  m = /\b(\d{1,2})\s*(?:de\s+)?([a-z]+)\.?(?:\s*(?:de|del)?\s*(\d{4}))?/.exec(t);
+  m = /\b(\d{1,2})[\s-]*(?:de\s+)?([a-z]+)\.?(?:[\s-]*(?:de|del)?\s*(\d{4}))?/.exec(t);
   if (m && MESES[m[2]] !== undefined) {
     const anio = m[3] ? +m[3] : anioPorDefecto;
     return anio ? fechaValida(anio, MESES[m[2]], +m[1]) : null;
@@ -87,7 +88,7 @@ export function parsearFecha(texto: string, anioPorDefecto?: number): string | n
   return null;
 }
 
-type Campo = "fecha" | "titulo" | "pilar" | "gancho";
+type Campo = "fecha" | "titulo" | "pilar" | "gancho" | "notas";
 
 function campoDeEncabezado(encabezado: string): Campo | null {
   const h = normalizar(limpiarMarkdown(encabezado));
@@ -95,6 +96,7 @@ function campoDeEncabezado(encabezado: string): Campo | null {
   if (/^(titulo|tema|video|titulo provisional|titular)\b/.test(h)) return "titulo";
   if (/^(pilar|categoria|serie|bloque)\b/.test(h)) return "pilar";
   if (/^(gancho|hook|apertura)\b/.test(h)) return "gancho";
+  if (/^(notas?|observaciones|comentarios?)\b/.test(h)) return "notas";
   return null;
 }
 
@@ -138,6 +140,7 @@ function leerTablas(lineas: string[], op: OpcionesAgenda, avisos: string[]): Ent
         titulo,
         pilar: vacioANull(valor("pilar")),
         gancho: vacioANull(valor("gancho")),
+        notas: vacioANull(valor("notas")),
       });
     }
     i = j - 1;
@@ -174,7 +177,7 @@ function leerSecciones(lineas: string[], op: OpcionesAgenda, avisos: string[]): 
         .replace(/^\d+\s*[.)·—–-]\s*/, "")
         .trim();
       const fecha = parsearFecha(encabezado, op.anioPorDefecto);
-      actual = { fecha, titulo, pilar: null, gancho: null };
+      actual = { fecha, titulo, pilar: null, gancho: null, notas: null };
       continue;
     }
     if (!actual) continue;

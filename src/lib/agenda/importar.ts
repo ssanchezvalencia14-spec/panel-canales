@@ -47,6 +47,7 @@ export async function importarAgenda(
           titulo: e.titulo,
           pilar: e.pilar,
           gancho: e.gancho,
+          notas: e.notas,
           fechaPublicacion,
         },
       });
@@ -54,7 +55,7 @@ export async function importarAgenda(
     } else if (existente.estado === "idea") {
       await db.video.update({
         where: { id: existente.id },
-        data: { pilar: e.pilar, gancho: e.gancho, fechaPublicacion },
+        data: { pilar: e.pilar, gancho: e.gancho, notas: e.notas, fechaPublicacion },
       });
       resumen.actualizados++;
     } else {
