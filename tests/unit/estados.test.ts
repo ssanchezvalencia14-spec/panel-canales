@@ -7,6 +7,7 @@ const ctx = (c: Partial<ContextoTransicion>): ContextoTransicion => ({
   rol: "productor",
   fuentesOk: false,
   aprobado: false,
+  ganchoOk: true,
   ...c,
 });
 
@@ -51,6 +52,15 @@ describe("transiciones de estado", () => {
     expect(validarTransicion(ctx({ desde: "revision", hasta: "guion" })).ok).toBe(true);
     expect(validarTransicion(ctx({ desde: "publicado", hasta: "programado", rol: "admin" })).ok).toBe(false);
     expect(validarTransicion(ctx({ desde: "programado", hasta: "aprobado", rol: "productor" })).ok).toBe(false);
+  });
+
+  it("sin gancho aprobado no se pasa de guion; retroceder sí se puede", () => {
+    const r = validarTransicion(ctx({ desde: "guion", hasta: "verificacion", ganchoOk: false }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toMatch(/gancho/);
+    expect(validarTransicion(ctx({ desde: "idea", hasta: "guion", ganchoOk: false })).ok).toBe(true);
+    expect(validarTransicion(ctx({ desde: "produccion", hasta: "guion", ganchoOk: false })).ok).toBe(true);
+    expect(validarTransicion(ctx({ desde: "produccion", hasta: "revision", ganchoOk: false })).ok).toBe(false);
   });
 
   it("la firma se crea al aprobar y se retira al volver atrás", () => {

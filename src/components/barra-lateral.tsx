@@ -8,6 +8,7 @@ const SECCIONES_CANAL = [
   { segmento: "tablero", nombre: "Tablero" },
   { segmento: "videos", nombre: "Videos" },
   { segmento: "estadisticas", nombre: "Estadísticas" },
+  { segmento: "ejecuciones", nombre: "Ejecuciones" },
   { segmento: "equipo", nombre: "Equipo" },
 ] as const;
 

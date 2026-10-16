@@ -43,6 +43,8 @@ export type ContextoTransicion = {
   fuentesOk: boolean;
   /** El video tiene firma de aprobación (aprobado_por + aprobado_en). */
   aprobado: boolean;
+  /** El gancho alcanza el objetivo del canal, o un admin lo forzó. */
+  ganchoOk: boolean;
 };
 
 export type ResultadoTransicion = { ok: true } | { ok: false; motivo: string };
@@ -75,6 +77,11 @@ export function validarTransicion(ctx: ContextoTransicion): ResultadoTransicion 
     return no(
       `No se pueden saltar estados: el siguiente paso después de «${NOMBRE_ESTADO[desde]}» es «${NOMBRE_ESTADO[ESTADOS_VIDEO[indice(desde) + 1]]}».`,
     );
+  }
+
+  // Regla del canal: sin gancho que alcance el objetivo no se pasa de «guion».
+  if (indice(hasta) >= indice("verificacion") && !ctx.ganchoOk) {
+    return no("El gancho no alcanza el objetivo del canal. Mejóralo y recalcula el puntaje, o pide a un admin que lo fuerce.");
   }
 
   switch (hasta) {

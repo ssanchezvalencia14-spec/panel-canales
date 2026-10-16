@@ -8,7 +8,7 @@ Plan completo por fases: [`docs/PLAN_PANEL_CANALES.pdf`](docs/PLAN_PANEL_CANALES
 
 ## Estado
 
-**Fases 0, 1 y 2** hechas. Desplegado en el dominio provisional de Hostinger.
+**Fases 0, 1, 2 y 3** hechas. Desplegado en el dominio provisional de Hostinger.
 
 | Entregable | Estado |
 |---|---|
@@ -31,7 +31,16 @@ Plan completo por fases: [`docs/PLAN_PANEL_CANALES.pdf`](docs/PLAN_PANEL_CANALES
 | Gráficos y tablero de resultados: mejor pilar, hora y día; comparación de ganchos | ✅ |
 | Exportación a CSV | ✅ |
 
-Pendiente para fases siguientes: mover videos en el tablero (arrastrar y soltar), registro de actividad y edición de la ficha del video.
+| **Fase 3 · Producción asistida** (el panel no renderiza video) | |
+| Puntaje de gancho (0-100, objetivo 72) y revisión de título (≤ 60, `sin-cifra`, `móvil`) guardados en el video | ✅ |
+| Bloqueo: sin gancho aprobado no se pasa de «guion»; un admin puede forzarlo | ✅ |
+| Borrador de guion con la API de Claude según las reglas de voz del canal | ✅ (requiere `ANTHROPIC_API_KEY`) |
+| Checklist de verificación de cifras con fuente obligatoria (alimenta `fuentes_ok`) | ✅ |
+| Panel de ejecuciones (voz, imágenes, subtítulos, render en la PC) con estado, costo y enlace | ✅ |
+| Tope de gasto por video (del canal, o propio del video) | ✅ |
+| «Marcar salida lista» con los enlaces de Drive de largo, TikToks y Shorts | ✅ |
+
+Pendiente para fases siguientes: arrastrar y soltar en el tablero y registro de actividad.
 
 ## Datos y estadísticas (Fase 2)
 
@@ -43,6 +52,24 @@ Pendiente para fases siguientes: mover videos en el tablero (arrastrar y soltar)
 - **Lo que no da la API de YouTube.** Impresiones y CTR de miniaturas no están en la API de YouTube Analytics. El CTR se carga con el CSV de YouTube Studio.
 - **Resultados.** Vistas promedio por pilar, por hora y por día de publicación, en la zona horaria del canal, y una tabla de ganchos con su puntaje frente a vistas y retención. Son promedios descriptivos, no predicciones. Con menos de 5 videos medidos, el panel lo advierte.
 - **Exportar CSV.** Una fila por publicación con su última medición, en UTF-8 con BOM (abre bien en Excel). Las celdas que empiezan por `=`, `+`, `-` o `@` se neutralizan para evitar fórmulas.
+
+## Producción asistida (Fase 3)
+
+En la ficha de cada video:
+
+- **Título, gancho y miniatura.** Al guardar se calculan el puntaje del gancho y la revisión del título, y quedan guardados en el video (`score_gancho`, `puntaje_gancho`, `revision_titulo`).
+  - El **gancho** suma cinco propiedades de 0 a 20: especificidad, dirigido a ti, riesgo, curiosidad y brevedad.
+  - El **título** se rechaza si pasa de 60 caracteres y recibe avisos `móvil` (más de 40, se corta en el celular), `sin-cifra`, `vago`, y de miniatura larga o repetida.
+  - Objetivo y límites salen de las reglas del canal (`objetivoGancho`, `tituloMax`, `tituloMovil`, `miniaturaPalabras`); por defecto, 72 / 60 / 40 / 3.
+  - Son **reimplementaciones propias** de la idea de `hookscore_es.py` y `title_es.py` descrita en la skill del canal, no un port línea a línea: los puntajes pueden diferir de los scripts originales. Sirven para descartar ganchos flojos, no predicen resultados.
+- **Bloqueo por gancho.** Para avanzar de «guion» a «verificación» o más allá, el gancho debe alcanzar el objetivo. Un admin puede **forzarlo**: queda registrado quién y cuándo, y el forzado se pierde si cambia el texto del gancho.
+- **Borrador de guion con IA.** Usa `claude-opus-5-5` (se cambia con `ANTHROPIC_MODEL`) con esfuerzo alto, salida estructurada y respaldo automático si el modelo declina (`fallbacks: "default"`).
+  - El prompt toma la voz, la estructura y la extensión de las reglas del canal (`voz`, `estructuraGuion`, `extensionGuion`), que son datos, no código. Las del canal #1 están reconstruidas a partir de la skill del canal; conviene revisarlas con el `voice.md` real.
+  - El modelo no puede inventar cifras: donde falta un dato escribe `[CIFRA: …]`, y cada cifra entra al checklist con su fuente sugerida.
+  - Antes de llamar se comprueba que el **peor caso** (32 000 tokens de salida) cabe en el tope de gasto. El costo real (tokens × precio) y el log quedan en `ejecuciones`, y el guion se guarda versionado en `guiones`.
+- **Verificación de cifras.** Cada cifra se marca verificada **solo con un enlace de fuente**; lo pueden hacer productor, revisor o admin. Con todas verificadas, `fuentes_ok` pasa a verdadero y el video puede ir a Producción. Si un video no tiene cifras, un revisor o admin lo declara explícitamente y queda en el registro.
+- **Ejecuciones.** Cada tarea externa (voz con ElevenLabs, imágenes, subtítulos, render de Remotion en la PC) se registra con estado, costo, enlace de salida y log. Hay una vista por video y un panel por canal, en **Ejecuciones**. Lo que supere el tope de gasto del video no se registra: un admin puede subir el tope del canal o el de ese video.
+- **Marcar salida lista.** Con el video en Producción, se pegan los enlaces de Google Drive de cada pieza. Cuántas piezas lleva cada video sale de `reglas.piezasPorVideo` (en el canal #1: 1 largo, 4 TikToks y 3 Shorts). Se guardan como activos versionados, se registra una ejecución con log y costo, y si se marca la casilla el video pasa a Revisión.
 
 ### Conectar Google (YouTube + Calendar)
 
@@ -192,6 +219,8 @@ Detalle en [`.env.example`](.env.example).
 | `AGENDA_ANIO` | opcional | Año para fechas de agenda sin año |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | para Google | Credenciales OAuth (YouTube Analytics + Calendar) |
 | `INTEGRACIONES_CLAVE` | para Google | 32 bytes en base64; cifra los permisos de Google guardados |
+| `ANTHROPIC_API_KEY` | para la IA | Clave de la API de Claude (borradores de guion) |
+| `ANTHROPIC_MODEL` | opcional | Modelo del borrador (por defecto `claude-opus-5-5`) |
 | `CRON_SECRET` | para el cron | Secreto de `/api/cron/sincronizar` (mín. 16 caracteres) |
 | `PANEL_NOMBRE`, `PANEL_COLOR_ACENTO` | opcional | Identidad neutra del panel |
 | `DB_LOCAL_PUERTO` | opcional | Puerto de `db:local` (3307) |

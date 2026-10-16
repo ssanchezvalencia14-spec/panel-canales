@@ -5,6 +5,7 @@
 import type { Db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import type { ConfigCanal } from "@/lib/dominio/canal-config";
+import { ganchoAprobado, objetivoGancho } from "@/lib/puntaje/gancho";
 import { insertarCanal } from "@/lib/canales";
 import {
   canalesVisibles,
@@ -183,7 +184,17 @@ export async function cambiarEstadoVideo(
 ) {
   const video = await db.video.findFirst({
     where: { id: videoId, ...filtroCanal(usuario) },
-    select: { id: true, canalId: true, estado: true, fuentesOk: true, aprobadoPorId: true, aprobadoEn: true },
+    select: {
+      id: true,
+      canalId: true,
+      estado: true,
+      fuentesOk: true,
+      aprobadoPorId: true,
+      aprobadoEn: true,
+      scoreGancho: true,
+      ganchoForzadoEn: true,
+      canal: { select: { reglas: true } },
+    },
   });
   if (!video) throw new NoEncontrado("Video no encontrado.");
 
@@ -193,6 +204,7 @@ export async function cambiarEstadoVideo(
     rol: rolEnCanal(usuario, video.canalId),
     fuentesOk: video.fuentesOk,
     aprobado: Boolean(video.aprobadoPorId && video.aprobadoEn),
+    ganchoOk: ganchoAprobado(video, objetivoGancho(video.canal.reglas)),
   });
   if (!resultado.ok) throw new TransicionInvalida(resultado.motivo);
 

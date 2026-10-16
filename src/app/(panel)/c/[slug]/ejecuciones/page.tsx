@@ -1,0 +1,91 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { claseCampo, FormularioAccion } from "@/components/formulario-accion";
+import { FormularioEjecucion, TablaEjecuciones } from "@/components/produccion-video";
+import { puede } from "@/lib/dominio/roles";
+import { prisma } from "@/server/db";
+import { listarVideosDeCanal, obtenerCanalPorSlug } from "@/server/acceso";
+import { topeCanalAccion } from "@/server/acciones/produccion";
+import { listarEjecuciones } from "@/server/produccion";
+import { requireUsuario } from "@/server/sesion";
+
+const usd = (n: number) => `US$ ${n.toFixed(2)}`;
+
+export default async function Ejecuciones({ params }: PageProps<"/c/[slug]/ejecuciones">) {
+  const { slug } = await params;
+  const usuario = await requireUsuario();
+  const canal = await obtenerCanalPorSlug(prisma, usuario, slug);
+  if (!canal) notFound();
+
+  const [ejecuciones, videos] = await Promise.all([listarEjecuciones(prisma, usuario, canal.id), listarVideosDeCanal(prisma, usuario, canal.id)]);
+  const edita = puede(usuario, canal.id, "editar_video");
+  const admin = puede(usuario, canal.id, "configurar_canal");
+  const tope = canal.limiteGastoVideo === null ? null : Number(canal.limiteGastoVideo);
+
+  const porVideo = new Map<string, { titulo: string; total: number }>();
+  for (const e of ejecuciones) {
+    if (!e.video) continue;
+    const previo = porVideo.get(e.video.id) ?? { titulo: e.video.titulo, total: 0 };
+    previo.total += Number(e.costo ?? 0);
+    porVideo.set(e.video.id, previo);
+  }
+  const total = ejecuciones.reduce((a, e) => a + Number(e.costo ?? 0), 0);
+  const conGasto = [...porVideo.entries()].sort((a, b) => b[1].total - a[1].total);
+
+  return (
+    <section className="space-y-6">
+      <p className="max-w-3xl text-sm text-suave">
+        Tareas que se hacen fuera del panel (voz, imágenes, subtítulos, render en la PC) y las que hace el panel (borradores con IA,
+        sincronizaciones). Cada una guarda estado, costo, enlace de salida y log. El panel no renderiza video.
+      </p>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-lg border border-borde bg-superficie p-4">
+          <p className="text-xs text-suave">Gasto registrado (últimas 200)</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{usd(total)}</p>
+        </div>
+        <div className="rounded-lg border border-borde bg-superficie p-4 md:col-span-2">
+          <p className="text-xs text-suave">Tope de gasto por video</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{tope === null ? "Sin tope" : usd(tope)}</p>
+          {admin && (
+            <FormularioAccion accion={topeCanalAccion.bind(null, canal.slug)} boton="Guardar tope" variante="secundario" className="mt-2 flex flex-wrap items-end gap-2">
+              <label className="text-sm">
+                Nuevo tope (USD, vacío = sin tope)
+                <input name="tope" type="number" min="0" step="0.01" defaultValue={tope ?? ""} className={`${claseCampo} mt-1 w-40`} />
+              </label>
+            </FormularioAccion>
+          )}
+          <p className="mt-2 text-xs text-suave">Un admin puede fijar un tope distinto para un video en su ficha. Lo que supere el tope no se registra.</p>
+        </div>
+      </div>
+
+      {conGasto.length > 0 && (
+        <div className="rounded-lg border border-borde bg-superficie p-4">
+          <h2 className="font-semibold">Gasto por video</h2>
+          <ul className="mt-2 space-y-1 text-sm">
+            {conGasto.map(([id, g]) => (
+              <li key={id} className="flex justify-between gap-3">
+                <Link href={`/c/${canal.slug}/videos/${id}`} className="truncate hover:text-acento hover:underline">
+                  {g.titulo}
+                </Link>
+                <span className="tabular-nums">
+                  {usd(g.total)}
+                  {tope !== null && <span className="text-suave"> / {usd(tope)}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {edita && (
+        <details className="rounded-lg border border-borde bg-superficie p-4">
+          <summary className="cursor-pointer font-semibold">Registrar tarea externa</summary>
+          <FormularioEjecucion slug={canal.slug} videoId={null} videos={videos.map((v) => ({ id: v.id, titulo: v.titulo }))} />
+        </details>
+      )}
+
+      <TablaEjecuciones slug={canal.slug} ejecuciones={ejecuciones} edita={edita} conVideo />
+    </section>
+  );
+}

@@ -10,6 +10,9 @@ import { prisma } from "@/server/db";
 import { obtenerCanalPorSlug } from "@/server/acceso";
 import { metricaManualAccion, quitarPublicacionAccion, registrarPublicacionAccion } from "@/server/acciones/estadisticas";
 import { fichaDeVideo } from "@/server/metricas";
+import { pedidoDeVideo, piezasDeCanal, produccionDeVideo } from "@/server/produccion";
+import { ProduccionVideo } from "@/components/produccion-video";
+import { objetivoGancho } from "@/lib/puntaje/gancho";
 import { requireUsuario } from "@/server/sesion";
 
 const FUENTE: Record<string, string> = { youtube_api: "YouTube API", csv: "CSV", manual: "Manual" };
@@ -23,6 +26,7 @@ export default async function FichaVideo({ params }: PageProps<"/c/[slug]/videos
   if (!video) notFound();
 
   const edita = puede(usuario, canal.id, "editar_video");
+  const prod = await produccionDeVideo(prisma, usuario, canal.id, video.id);
   const hoy = fechaLocal(new Date(), canal.zonaHoraria);
   const n = (v: number | null | undefined, dec = 0) =>
     v === null || v === undefined ? "—" : new Intl.NumberFormat(canal.idioma, { maximumFractionDigits: dec }).format(v);
@@ -69,6 +73,23 @@ export default async function FichaVideo({ params }: PageProps<"/c/[slug]/videos
           )}
         </dl>
       </div>
+
+      <ProduccionVideo
+        slug={canal.slug}
+        idioma={canal.idioma}
+        objetivo={objetivoGancho(canal.reglas)}
+        piezas={piezasDeCanal(canal.reglas)}
+        permisos={{
+          edita,
+          admin: puede(usuario, canal.id, "configurar_canal"),
+          verifica: edita || puede(usuario, canal.id, "aprobar"),
+          aprueba: puede(usuario, canal.id, "aprobar"),
+          mueve: puede(usuario, canal.id, "mover_estado"),
+        }}
+        pedido={pedidoDeVideo({ ...video, canal })}
+        video={{ ...video, limiteGasto: video.limiteGasto === null ? null : Number(video.limiteGasto) }}
+        {...prod}
+      />
 
       <div>
         <h3 className="text-lg font-semibold">Publicaciones y métricas</h3>

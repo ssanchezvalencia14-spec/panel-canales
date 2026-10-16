@@ -19,6 +19,7 @@
     "build:hostinger": "prisma generate && prisma migrate deploy && tsx scripts/seed.ts && next build --webpack"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@auth/prisma-adapter": "^2.11.3",
     "@prisma/adapter-mariadb": "^7.10.1",
     "@prisma/client": "^7.10.1",

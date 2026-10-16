@@ -136,6 +136,8 @@ describe("permisos y aprobación humana", () => {
 
   it("flujo completo con firma de aprobación y reglas de fuentes", async () => {
     const { id } = await videoDe(canalA, "Video A1");
+    // Desde la Fase 3 hace falta un gancho que alcance el objetivo para pasar de guion.
+    await db.video.update({ where: { id }, data: { scoreGancho: 80 } });
     await cambiarEstadoVideo(db, u.productorA, id, "guion");
     await cambiarEstadoVideo(db, u.productorA, id, "verificacion");
 

@@ -76,6 +76,9 @@ model User {
   videosAprobados Video[]       @relation("VideoAprobadoPor")
   tareasAsignadas Tarea[]       @relation("TareaResponsable")
   integraciones   Integracion[] @relation("IntegracionConectadaPor")
+  ganchosForzados Video[]       @relation("VideoGanchoForzadoPor")
+  ejecuciones     Ejecucion[]   @relation("EjecucionRegistradaPor")
+  guiones         Guion[]       @relation("GuionCreadoPor")
 
   @@map("users")
 }
@@ -168,6 +171,7 @@ model Canal {
   ejecuciones   Ejecucion[]
   integraciones Integracion[]
   eventos       EventoCalendario[]
+  guiones       Guion[]
 
   @@map("canales")
 }
@@ -175,29 +179,42 @@ model Canal {
 // ─────────────────────────── Contenido ───────────────────────────
 
 model Video {
-  id               String      @id @default(cuid())
-  canalId          String      @map("canal_id")
-  titulo           String      @db.VarChar(300)
-  pilar            String?
-  fechaPublicacion DateTime?   @map("fecha_publicacion")
-  estado           EstadoVideo @default(idea)
-  gancho           String?     @db.Text
-  scoreGancho      Float?      @map("score_gancho")
-  fuentesOk        Boolean     @default(false) @map("fuentes_ok")
-  notas            String?     @db.Text
+  id                 String      @id @default(cuid())
+  canalId            String      @map("canal_id")
+  titulo             String      @db.VarChar(300)
+  pilar              String?
+  fechaPublicacion   DateTime?   @map("fecha_publicacion")
+  estado             EstadoVideo @default(idea)
+  gancho             String?     @db.Text
+  scoreGancho        Float?      @map("score_gancho")
+  /// Desglose del puntaje del gancho (propiedades y sugerencias).
+  puntajeGancho      Json?       @map("puntaje_gancho")
+  /// Texto de la miniatura (≤ 3 palabras, distinto del título).
+  textoMiniatura     String?     @map("texto_miniatura") @db.VarChar(120)
+  /// Revisión del título: banderas como sin-cifra, móvil, largo.
+  revisionTitulo     Json?       @map("revision_titulo")
+  /// Un admin puede dejar avanzar un video con gancho bajo el objetivo.
+  ganchoForzadoPorId String?     @map("gancho_forzado_por_id")
+  ganchoForzadoEn    DateTime?   @map("gancho_forzado_en")
+  /// Tope de gasto de IA propio del video (USD); si es null rige el del canal.
+  limiteGasto        Decimal?    @map("limite_gasto") @db.Decimal(10, 2)
+  fuentesOk          Boolean     @default(false) @map("fuentes_ok")
+  notas              String?     @db.Text
   /// Firma de aprobación humana: quién aprobó y cuándo.
-  aprobadoPorId    String?     @map("aprobado_por_id")
-  aprobadoEn       DateTime?   @map("aprobado_en")
-  creadoEn         DateTime    @default(now()) @map("creado_en")
-  actualizadoEn    DateTime    @updatedAt @map("actualizado_en")
+  aprobadoPorId      String?     @map("aprobado_por_id")
+  aprobadoEn         DateTime?   @map("aprobado_en")
+  creadoEn           DateTime    @default(now()) @map("creado_en")
+  actualizadoEn      DateTime    @updatedAt @map("actualizado_en")
 
-  canal         Canal              @relation(fields: [canalId], references: [id], onDelete: Cascade)
-  aprobadoPor   User?              @relation("VideoAprobadoPor", fields: [aprobadoPorId], references: [id], onDelete: SetNull)
-  tareas        Tarea[]
-  activos       Activo[]
-  publicaciones Publicacion[]
-  ejecuciones   Ejecucion[]
-  eventos       EventoCalendario[]
+  canal            Canal              @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  aprobadoPor      User?              @relation("VideoAprobadoPor", fields: [aprobadoPorId], references: [id], onDelete: SetNull)
+  ganchoForzadoPor User?              @relation("VideoGanchoForzadoPor", fields: [ganchoForzadoPorId], references: [id], onDelete: SetNull)
+  guiones          Guion[]
+  tareas           Tarea[]
+  activos          Activo[]
+  publicaciones    Publicacion[]
+  ejecuciones      Ejecucion[]
+  eventos          EventoCalendario[]
 
   @@unique([canalId, id])
   @@index([canalId, fechaPublicacion])
@@ -364,20 +381,48 @@ model EventoCalendario {
 }
 
 model Ejecucion {
-  id            String          @id @default(cuid())
-  canalId       String          @map("canal_id")
-  videoId       String?         @map("video_id")
-  tipo          String
-  estado        EstadoEjecucion @default(en_cola)
-  log           String?         @db.LongText
+  id              String          @id @default(cuid())
+  canalId         String          @map("canal_id")
+  videoId         String?         @map("video_id")
+  tipo            String
+  estado          EstadoEjecucion @default(en_cola)
+  log             String?         @db.LongText
+  /// Enlace a la salida (Drive, etc.). El panel guarda enlaces, no archivos.
+  salidaUrl       String?         @map("salida_url") @db.Text
+  registradoPorId String?         @map("registrado_por_id")
   /// Costo en USD de la ejecución (créditos de IA, etc.).
-  costo         Decimal?        @db.Decimal(10, 4)
-  creadoEn      DateTime        @default(now()) @map("creado_en")
-  actualizadoEn DateTime        @updatedAt @map("actualizado_en")
+  costo           Decimal?        @db.Decimal(10, 4)
+  creadoEn        DateTime        @default(now()) @map("creado_en")
+  actualizadoEn   DateTime        @updatedAt @map("actualizado_en")
 
-  canal Canal  @relation(fields: [canalId], references: [id], onDelete: Cascade)
-  video Video? @relation(fields: [canalId, videoId], references: [canalId, id], onDelete: Cascade)
+  canal         Canal  @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  video         Video? @relation(fields: [canalId, videoId], references: [canalId, id], onDelete: Cascade)
+  registradoPor User?  @relation("EjecucionRegistradaPor", fields: [registradoPorId], references: [id], onDelete: SetNull)
 
   @@index([canalId, estado])
+  @@index([canalId, videoId])
   @@map("ejecuciones")
+}
+
+/// Borradores de guion de un video, versionados. El panel no publica nada:
+/// un guion es un insumo que revisa una persona.
+model Guion {
+  id          String   @id @default(cuid())
+  canalId     String   @map("canal_id")
+  videoId     String   @map("video_id")
+  version     Int
+  contenido   String   @db.LongText
+  /// Modelo que lo generó, o null si se escribió a mano.
+  modelo      String?  @db.VarChar(64)
+  ejecucionId String?  @map("ejecucion_id")
+  creadoPorId String?  @map("creado_por_id")
+  creadoEn    DateTime @default(now()) @map("creado_en")
+
+  canal     Canal @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  video     Video @relation(fields: [canalId, videoId], references: [canalId, id], onDelete: Cascade)
+  creadoPor User? @relation("GuionCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+
+  @@unique([videoId, version])
+  @@index([canalId, videoId])
+  @@map("guiones")
 }

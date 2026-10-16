@@ -23,7 +23,29 @@
       "shorts": 3
     },
     "formatoVertical": "1080x1920",
-    "diasProduccionAntes": 3
+    "diasProduccionAntes": 3,
+    "objetivoGancho": 72,
+    "tituloMax": 60,
+    "tituloMovil": 40,
+    "miniaturaPalabras": 3,
+    "voz": [
+      "Español neutro para Latinoamérica y latinos en EE. UU. (22 a 40 años): frases cortas y claras.",
+      "Le hablas a una persona (tú). Cada término financiero se explica la primera vez que aparece.",
+      "Promesa del canal: el dinero que nadie te explica (quién pone el dinero, quién cobra, quién pierde).",
+      "Canal sin cara: voz narrada sobre ilustración 2D. En cada bloque marca entre corchetes qué se ve en pantalla.",
+      "Informativo, nunca asesoría financiera personalizada; no instruye a cometer delitos.",
+      "Sin texto en inglés en lo que se muestra en pantalla."
+    ],
+    "estructuraGuion": [
+      "Escena de apertura: el gancho aprobado es la primera frase.",
+      "Promesa: confirma el título en la primera frase después de la escena.",
+      "4 o 5 bloques; cada uno con una cifra o una regla y una conclusión numerada.",
+      "Giro de matiz: lo que complica la explicación anterior.",
+      "Regla práctica que quien mira puede aplicar.",
+      "Pregunta para los comentarios.",
+      "Adelanto del próximo video."
+    ],
+    "extensionGuion": "1000 a 1400 palabras (unas 150 por minuto)"
   },
   "limiteGastoVideo": null,
   "agenda": "docs/AGENDA_PUBLICACION_10_VIDEOS.md",
