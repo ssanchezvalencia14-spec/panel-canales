@@ -32,9 +32,9 @@ describe("parsearAgenda", () => {
     ].join("\n");
     const { entradas, avisos } = parsearAgenda(md);
     expect(entradas).toEqual([
-      { fecha: "2026-10-19", titulo: "Primer video", pilar: "Pilar uno", gancho: "Una escena", notas: null },
-      { fecha: "2026-10-21", titulo: "Segundo video", pilar: null, gancho: null, notas: null },
-      { fecha: null, titulo: "Tercer video", pilar: "Pilar uno", gancho: null, notas: null },
+      { fecha: "2026-10-19", titulo: "Primer video", pilar: "Pilar uno", gancho: "Una escena", notas: null, estado: null },
+      { fecha: "2026-10-21", titulo: "Segundo video", pilar: null, gancho: null, notas: null, estado: null },
+      { fecha: null, titulo: "Tercer video", pilar: "Pilar uno", gancho: null, notas: null, estado: null },
     ]);
     expect(avisos.some((a) => a.includes("por definir"))).toBe(true);
   });
@@ -65,6 +65,18 @@ describe("parsearAgenda", () => {
       titulo: "Un video",
       notas: "Fecha clave el 27-nov",
     });
+  });
+
+  it("lee el estado inicial y avisa si no lo conoce", () => {
+    const md = ["| Fecha | Video | Estado |", "|---|---|---|", "| 2026-11-02 | Uno | Revisión |", "| 2026-11-03 | Dos | listo |"].join("\n");
+    const { entradas, avisos } = parsearAgenda(md);
+    expect(entradas.map((e) => e.estado)).toEqual(["revision", null]);
+    expect(avisos.some((a) => a.includes("listo"))).toBe(true);
+  });
+
+  it("toma el año del documento si las fechas no lo traen", () => {
+    const md = ["Año: 2027", "", "| Fecha | Video |", "|---|---|", "| Lun 4-ene | Uno |"].join("\n");
+    expect(parsearAgenda(md).entradas[0].fecha).toBe("2027-01-04");
   });
 
   it("avisa si no encuentra videos", () => {

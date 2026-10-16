@@ -1,4 +1,5 @@
 import { signOut } from "@/auth";
+import { BarraLateral } from "@/components/barra-lateral";
 import { BarraSuperior } from "@/components/barra-superior";
 import { nombrePanel } from "@/lib/panel";
 import { prisma } from "@/server/db";
@@ -25,7 +26,10 @@ export default async function PanelLayout({ children }: LayoutProps<"/">) {
         }}
         salir={salir}
       />
-      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+      <div className="md:flex">
+        <BarraLateral esSuperadmin={usuario.esSuperadmin} canales={canales.map((c) => ({ slug: c.slug }))} />
+        <main className="min-w-0 flex-1 px-4 py-8 md:px-8">{children}</main>
+      </div>
     </>
   );
 }

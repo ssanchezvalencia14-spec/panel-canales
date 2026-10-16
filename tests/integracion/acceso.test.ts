@@ -9,7 +9,14 @@ import { crearPrisma, type Db } from "@/lib/db";
 import { guardarCanal, validarConfigCanal } from "@/lib/canales";
 import { crearOActualizarUsuario } from "@/lib/usuarios";
 import { importarAgenda } from "@/lib/agenda/importar";
+import { validarConfigCanal as configValida } from "@/lib/canales";
 import {
+  agregarMiembro,
+  cambiarRolMiembro,
+  crearCanal,
+  listarMiembros,
+  quitarMiembro,
+  usuarioDeSesion,
   cambiarEstadoVideo,
   cargarUsuario,
   listarCanales,
@@ -162,5 +169,72 @@ describe("permisos y aprobación humana", () => {
   it("un usuario desactivado deja de tener sesión", async () => {
     await db.user.update({ where: { id: u.revisorA.id }, data: { activo: false } });
     expect(await cargarUsuario(db, u.revisorA.id)).toBeNull();
+  });
+});
+
+describe("crear canal desde la UI", () => {
+  const nuevo = () =>
+    configValida({
+      slug: "canal-c",
+      nombre: "Canal C",
+      zonaHoraria: "America/Mexico_City",
+      horaPublicacion: "18:00",
+      diasPublicacion: ["mar"],
+      colorAcento: "#778899",
+      pilares: ["Uno"],
+    });
+
+  it("solo el superadmin puede crear canales", async () => {
+    await expect(crearCanal(db, u.adminA, nuevo())).rejects.toBeInstanceOf(AccesoDenegado);
+    await expect(crearCanal(db, u.productorA, nuevo())).rejects.toBeInstanceOf(AccesoDenegado);
+  });
+
+  it("el superadmin crea un canal vacío, que nadie más ve", async () => {
+    const c = await crearCanal(db, u.superadmin, nuevo());
+    expect(await db.video.count({ where: { canalId: c.id } })).toBe(0);
+    expect((await listarCanales(db, u.superadmin)).map((x) => x.slug)).toContain("canal-c");
+    expect((await listarCanales(db, u.adminA)).map((x) => x.slug)).not.toContain("canal-c");
+    expect(await obtenerCanalPorSlug(db, u.lectorB, "canal-c")).toBeNull();
+  });
+
+  it("no sobrescribe un canal existente", async () => {
+    await expect(crearCanal(db, u.superadmin, nuevo())).rejects.toThrow(/Ya existe/);
+  });
+});
+
+describe("gestión del equipo", () => {
+  it("el admin agrega, cambia el rol y quita miembros de su canal", async () => {
+    await agregarMiembro(db, u.adminA, canalA, { email: "Nuevo@Prueba.test", rol: "lector" });
+    const nuevo = await db.user.findUniqueOrThrow({ where: { email: "nuevo@prueba.test" } });
+    await cambiarRolMiembro(db, u.adminA, canalA, nuevo.id, "revisor");
+    const miembros = await listarMiembros(db, u.adminA, canalA);
+    expect(miembros.find((m) => m.user.id === nuevo.id)?.rol).toBe("revisor");
+    await quitarMiembro(db, u.adminA, canalA, nuevo.id);
+    expect((await listarMiembros(db, u.adminA, canalA)).some((m) => m.user.id === nuevo.id)).toBe(false);
+  });
+
+  it("un productor no gestiona el equipo", async () => {
+    await expect(agregarMiembro(db, u.productorA, canalA, { email: "x@prueba.test", rol: "admin" })).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
+  });
+
+  it("un admin no gestiona el equipo de otro canal ni se cambia su propio rol", async () => {
+    await expect(agregarMiembro(db, u.adminA, canalB, { email: "x@prueba.test", rol: "lector" })).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
+    await expect(listarMiembros(db, u.adminA, canalB)).rejects.toBeInstanceOf(AccesoDenegado);
+    await expect(cambiarRolMiembro(db, u.adminA, canalA, u.adminA.id, "lector")).rejects.toBeInstanceOf(AccesoDenegado);
+  });
+});
+
+describe("sesión que lee el proxy", () => {
+  it("devuelve los canales del usuario y rechaza sesiones vencidas", async () => {
+    const vence = new Date(Date.now() + 3600_000);
+    await db.session.create({ data: { sessionToken: "tok-prod", userId: u.productorA.id, expires: vence } });
+    await db.session.create({ data: { sessionToken: "tok-viejo", userId: u.productorA.id, expires: new Date(Date.now() - 1000) } });
+    expect(await usuarioDeSesion(db, "tok-prod")).toEqual({ esSuperadmin: false, slugs: ["canal-a"] });
+    expect(await usuarioDeSesion(db, "tok-viejo")).toBeNull();
+    expect(await usuarioDeSesion(db, "no-existe")).toBeNull();
   });
 });

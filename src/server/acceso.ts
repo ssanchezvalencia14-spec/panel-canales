@@ -4,9 +4,12 @@
 
 import type { Db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
+import type { ConfigCanal } from "@/lib/dominio/canal-config";
+import { insertarCanal } from "@/lib/canales";
 import {
   canalesVisibles,
   puede,
+  puedeAdministrarRed,
   rolEnCanal,
   type Rol,
   type UsuarioConMembresias,
@@ -211,4 +214,107 @@ export async function cambiarEstadoVideo(
     throw new TransicionInvalida("El video cambió mientras tanto. Recarga e inténtalo de nuevo.");
   }
   return db.video.findUniqueOrThrow({ where: { id: video.id } });
+}
+
+// ─────────────────────────── Canales de la red ───────────────────────────
+
+/** Crea un canal nuevo desde la UI. Solo el superadmin de red. */
+export async function crearCanal(db: Db, usuario: UsuarioSesion, config: ConfigCanal) {
+  if (!puedeAdministrarRed(usuario)) {
+    throw new AccesoDenegado("Solo un superadmin de red puede crear canales.");
+  }
+  return insertarCanal(db, config);
+}
+
+// ─────────────────────────── Equipo del canal ───────────────────────────
+
+export async function listarMiembros(db: Db, usuario: UsuarioSesion, canalId: string) {
+  if (!puede(usuario, canalId, "ver")) throw new AccesoDenegado();
+  return db.membresia.findMany({
+    where: { canalId },
+    orderBy: [{ rol: "asc" }, { creadoEn: "asc" }],
+    select: {
+      rol: true,
+      creadoEn: true,
+      user: { select: { id: true, email: true, name: true, activo: true, esSuperadmin: true } },
+    },
+  });
+}
+
+function exigirGestion(usuario: UsuarioSesion, canalId: string) {
+  if (!puede(usuario, canalId, "gestionar_miembros")) {
+    throw new AccesoDenegado("Solo un admin del canal puede gestionar el equipo.");
+  }
+}
+
+/** Da acceso a un correo (lo crea si no existe) con un rol en el canal. */
+export async function agregarMiembro(
+  db: Db,
+  usuario: UsuarioSesion,
+  canalId: string,
+  datos: { email: string; nombre?: string; rol: Rol },
+) {
+  exigirGestion(usuario, canalId);
+  const email = datos.email.trim().toLowerCase();
+  const miembro = await db.user.upsert({
+    where: { email },
+    create: { email, name: datos.nombre?.trim() || null },
+    update: {},
+  });
+  return db.membresia.upsert({
+    where: { userId_canalId: { userId: miembro.id, canalId } },
+    create: { userId: miembro.id, canalId, rol: datos.rol },
+    update: { rol: datos.rol },
+  });
+}
+
+export async function cambiarRolMiembro(
+  db: Db,
+  usuario: UsuarioSesion,
+  canalId: string,
+  userId: string,
+  rol: Rol,
+) {
+  exigirGestion(usuario, canalId);
+  if (userId === usuario.id && !usuario.esSuperadmin) {
+    throw new AccesoDenegado("No puedes cambiar tu propio rol.");
+  }
+  const { count } = await db.membresia.updateMany({ where: { canalId, userId }, data: { rol } });
+  if (count === 0) throw new NoEncontrado("Esa persona no es miembro del canal.");
+}
+
+export async function quitarMiembro(db: Db, usuario: UsuarioSesion, canalId: string, userId: string) {
+  exigirGestion(usuario, canalId);
+  if (userId === usuario.id && !usuario.esSuperadmin) {
+    throw new AccesoDenegado("No puedes quitarte a ti mismo del canal.");
+  }
+  const { count } = await db.membresia.deleteMany({ where: { canalId, userId } });
+  if (count === 0) throw new NoEncontrado("Esa persona no es miembro del canal.");
+}
+
+// ─────────────────────────── Sesión (proxy) ───────────────────────────
+
+/**
+ * Usuario de una cookie de sesión de Auth.js, con los slugs de sus canales.
+ * Null si la sesión no existe, venció o el usuario está desactivado.
+ */
+export async function usuarioDeSesion(db: Db, sessionToken: string, ahora = new Date()) {
+  const sesion = await db.session.findUnique({
+    where: { sessionToken },
+    select: {
+      expires: true,
+      user: {
+        select: {
+          activo: true,
+          esSuperadmin: true,
+          membresias: { select: { canal: { select: { slug: true } } } },
+        },
+      },
+    },
+  });
+  if (!sesion || sesion.expires <= ahora || !sesion.user.activo) return null;
+  return {
+    esSuperadmin: sesion.user.esSuperadmin,
+    slugs: sesion.user.membresias.map((m) => m.canal.slug),
+  };
 }

@@ -5,6 +5,8 @@
 //  2. Secciones con encabezado por video (## / ###) y líneas «Clave: valor».
 // No inventa datos: lo que no se puede leer queda vacío y se reporta en `avisos`.
 
+import { ESTADOS_VIDEO, type EstadoVideo } from "@/lib/dominio/estados";
+
 export type EntradaAgenda = {
   /** Fecha local "YYYY-MM-DD" o null si no se pudo leer. */
   fecha: string | null;
@@ -12,6 +14,8 @@ export type EntradaAgenda = {
   pilar: string | null;
   gancho: string | null;
   notas: string | null;
+  /** Estado inicial indicado en la agenda; null = el de por defecto («idea»). */
+  estado: EstadoVideo | null;
 };
 
 export type ResultadoAgenda = {
@@ -88,7 +92,7 @@ export function parsearFecha(texto: string, anioPorDefecto?: number): string | n
   return null;
 }
 
-type Campo = "fecha" | "titulo" | "pilar" | "gancho" | "notas";
+type Campo = "fecha" | "titulo" | "pilar" | "gancho" | "notas" | "estado";
 
 function campoDeEncabezado(encabezado: string): Campo | null {
   const h = normalizar(limpiarMarkdown(encabezado));
@@ -97,6 +101,7 @@ function campoDeEncabezado(encabezado: string): Campo | null {
   if (/^(pilar|categoria|serie|bloque)\b/.test(h)) return "pilar";
   if (/^(gancho|hook|apertura)\b/.test(h)) return "gancho";
   if (/^(notas?|observaciones|comentarios?)\b/.test(h)) return "notas";
+  if (/^(estado|fase)\b/.test(h)) return "estado";
   return null;
 }
 
@@ -107,6 +112,16 @@ function celdas(linea: string): string[] {
     .replace(/\|$/, "")
     .split("|")
     .map((c) => c.trim());
+}
+
+/** Estado escrito en la agenda («Verificación», «revision»…) o null si no es válido. */
+function leerEstado(texto: string | undefined, titulo: string, avisos: string[]): EstadoVideo | null {
+  const limpio = vacioANull(texto);
+  if (!limpio) return null;
+  const n = normalizar(limpio);
+  const estado = ESTADOS_VIDEO.find((e) => e === n);
+  if (!estado) avisos.push(`Estado desconocido «${limpio}» en «${titulo}»: se usa «idea».`);
+  return estado ?? null;
 }
 
 const esSeparador = (linea: string) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(linea);
@@ -141,6 +156,7 @@ function leerTablas(lineas: string[], op: OpcionesAgenda, avisos: string[]): Ent
         pilar: vacioANull(valor("pilar")),
         gancho: vacioANull(valor("gancho")),
         notas: vacioANull(valor("notas")),
+        estado: leerEstado(valor("estado"), titulo, avisos),
       });
     }
     i = j - 1;
@@ -177,7 +193,7 @@ function leerSecciones(lineas: string[], op: OpcionesAgenda, avisos: string[]): 
         .replace(/^\d+\s*[.)·—–-]\s*/, "")
         .trim();
       const fecha = parsearFecha(encabezado, op.anioPorDefecto);
-      actual = { fecha, titulo, pilar: null, gancho: null, notas: null };
+      actual = { fecha, titulo, pilar: null, gancho: null, notas: null, estado: null };
       continue;
     }
     if (!actual) continue;
@@ -191,6 +207,8 @@ function leerSecciones(lineas: string[], op: OpcionesAgenda, avisos: string[]): 
       actual.fecha = parsearFecha(kv[2], op.anioPorDefecto);
     } else if (campo === "titulo") {
       actual.titulo = valor;
+    } else if (campo === "estado") {
+      actual.estado = leerEstado(valor, actual.titulo, avisos);
     } else {
       actual[campo] = valor;
     }
@@ -211,6 +229,9 @@ function leerSecciones(lineas: string[], op: OpcionesAgenda, avisos: string[]): 
 export function parsearAgenda(markdown: string, op: OpcionesAgenda = {}): ResultadoAgenda {
   const avisos: string[] = [];
   const lineas = markdown.replace(/\r\n?/g, "\n").split("\n");
+  // Un «Año: 2026» en el documento vale como año por defecto si no se indicó otro.
+  const anioDoc = /\ba(?:ñ|n)o:\s*(\d{4})\b/i.exec(markdown);
+  if (!op.anioPorDefecto && anioDoc) op = { ...op, anioPorDefecto: Number(anioDoc[1]) };
 
   let entradas = leerTablas(lineas, op, avisos);
   if (entradas.length === 0) entradas = leerSecciones(lineas, op, avisos);

@@ -5,6 +5,7 @@
 import type { Db } from "@/lib/db";
 import { leerPilares } from "@/lib/dominio/canal-config";
 import { fechaLocalAUtc } from "@/lib/dominio/fechas";
+import { ESTADOS_CON_APROBACION, type EstadoVideo } from "@/lib/dominio/estados";
 import { parsearAgenda, type OpcionesAgenda } from "./parsear";
 
 export type ResumenImportacion = {
@@ -31,6 +32,13 @@ export async function importarAgenda(
     if (e.pilar && pilares.length && !pilares.includes(e.pilar)) {
       resumen.avisos.push(`«${e.titulo}»: el pilar «${e.pilar}» no está en la configuración del canal.`);
     }
+    // Una agenda nunca puede dejar un video aprobado, programado o publicado:
+    // esos estados exigen la firma de una persona con rol.
+    let estado: EstadoVideo = e.estado ?? "idea";
+    if (ESTADOS_CON_APROBACION.includes(estado)) {
+      resumen.avisos.push(`«${e.titulo}»: el estado «${estado}» exige aprobación humana; se importa en «revision».`);
+      estado = "revision";
+    }
     const fechaPublicacion = e.fecha
       ? fechaLocalAUtc(e.fecha, canal.horaPublicacion, canal.zonaHoraria)
       : null;
@@ -48,6 +56,7 @@ export async function importarAgenda(
           pilar: e.pilar,
           gancho: e.gancho,
           notas: e.notas,
+          estado,
           fechaPublicacion,
         },
       });
@@ -55,7 +64,7 @@ export async function importarAgenda(
     } else if (existente.estado === "idea") {
       await db.video.update({
         where: { id: existente.id },
-        data: { pilar: e.pilar, gancho: e.gancho, notas: e.notas, fechaPublicacion },
+        data: { pilar: e.pilar, gancho: e.gancho, notas: e.notas, estado, fechaPublicacion },
       });
       resumen.actualizados++;
     } else {

@@ -37,3 +37,13 @@ export function leerPilares(valor: unknown): string[] {
 export function leerDias(valor: unknown): string[] {
   return Array.isArray(valor) ? valor.filter((x): x is string => typeof x === "string") : [];
 }
+
+/** «Mi Canal Nuevo» → «mi-canal-nuevo». */
+export function aSlug(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}

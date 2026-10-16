@@ -25,5 +25,16 @@
     "formatoVertical": "1080x1920",
     "diasProduccionAntes": 3
   },
-  "limiteGastoVideo": null
+  "limiteGastoVideo": null,
+  "agenda": "docs/AGENDA_PUBLICACION_10_VIDEOS.md",
+  "equipo": [
+    {
+      "email": "juanpablogonzalez723@gmail.com",
+      "rol": "productor"
+    },
+    {
+      "email": "michaelicloud26@gmail.com",
+      "rol": "productor"
+    }
+  ]
 }

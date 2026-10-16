@@ -5,7 +5,7 @@
 import NextAuth from "next-auth";
 import Nodemailer from "next-auth/providers/nodemailer";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/server/db";
+import { prisma } from "@/lib/prisma-global";
 import { configSmtp, enviarEnlaceDeAcceso } from "@/lib/correo";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({

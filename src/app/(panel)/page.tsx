@@ -7,13 +7,29 @@ import { prisma } from "@/server/db";
 import { resumenRed } from "@/server/acceso";
 import { requireUsuario } from "@/server/sesion";
 
-export default async function VistaRed() {
+export default async function VistaRed({ searchParams }: PageProps<"/">) {
   const usuario = await requireUsuario();
   const resumen = await resumenRed(prisma, usuario);
+  const { aviso } = await searchParams;
 
   return (
     <section>
-      <h1 className="text-2xl font-semibold">Red</h1>
+      {aviso === "sin-acceso" && (
+        <p role="alert" className="mb-4 rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-sm text-red-200">
+          No tienes acceso a esa sección.
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-semibold">Red</h1>
+        {usuario.esSuperadmin && (
+          <Link
+            href="/canales/nuevo"
+            className="ml-auto rounded-md bg-acento px-3 py-1.5 text-sm font-semibold text-fondo hover:opacity-90"
+          >
+            + Nuevo canal
+          </Link>
+        )}
+      </div>
       <p className="mt-1 text-sm text-suave">
         {usuario.esSuperadmin ? "Todos los canales de la red." : "Los canales en los que participas."}
       </p>
@@ -27,7 +43,7 @@ export default async function VistaRed() {
           {resumen.map(({ canal, total, porEstado, proxima }) => (
             <li key={canal.id}>
               <Link
-                href={`/c/${canal.slug}`}
+                href={`/c/${canal.slug}/calendario`}
                 style={{ "--acento": colorSeguro(canal.colorAcento, acentoPanel()) } as React.CSSProperties}
                 className="block rounded-xl border border-borde bg-superficie p-5 transition hover:border-acento"
               >

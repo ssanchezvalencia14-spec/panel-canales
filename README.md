@@ -6,16 +6,24 @@ El proyecto no lleva el nombre de ningún canal. Cada canal (marca, idioma, zona
 
 Plan completo por fases: [`docs/PLAN_PANEL_CANALES.pdf`](docs/PLAN_PANEL_CANALES.pdf).
 
-## Estado: Fase 0 · Fundamentos
+## Estado
+
+**Fase 0 · Fundamentos** y **Fase 1 · Panel base** hechas. Desplegado en el dominio provisional de Hostinger.
 
 | Entregable | Estado |
 |---|---|
-| Next.js (App Router, TS) + Tailwind, tema neutro con acento por canal, layout con navegación | ✅ |
-| Esquema MySQL con Prisma y migración inicial | ✅ |
-| Permisos por rol aplicados en el servidor (capa de acceso) | ✅ |
-| Auth.js con enlace por correo (SMTP) | ✅ (probado en local; falta SMTP real) |
-| Carga inicial (seed) de canales y agenda | ✅ canal #1 · ⏳ falta el archivo de agenda |
-| Despliegue en Hostinger Node.js | ⏳ pendiente (ver «Despliegue») |
+| Next.js + Tailwind, tema neutro con acento por canal | ✅ |
+| Navegación lateral: Calendario, Tablero, Videos, Estadísticas, Equipo | ✅ |
+| Selector de canal y vista «Red» con resumen de todos los canales | ✅ |
+| Prisma + MySQL con el modelo del plan y migraciones | ✅ |
+| Auth.js con enlace por correo (solo correos existentes en `users`) | ✅ (en producción depende de credenciales SMTP válidas) |
+| Proxy (middleware) que aplica roles en el servidor | ✅ |
+| Pantalla «Nuevo canal» (sin tocar código) | ✅ |
+| Gestión del equipo del canal (dar acceso, cambiar rol, quitar) | ✅ |
+| Seed: canal #1, superadmin, productores, 16 videos de la agenda | ✅ |
+| Build para Hostinger Node.js | ✅ |
+
+Pendiente para fases siguientes: mover videos en el tablero (arrastrar y soltar), ficha de cada video, registro de actividad, eventos de reunión en el calendario y métricas reales (Fase 2).
 
 ## Stack
 
@@ -29,16 +37,18 @@ Sin VPS, Supabase ni Vercel. Remotion, voz e imágenes quedan fuera del panel: e
 ## Estructura
 
 ```
-datos/canales/*.json     Configuración de cada canal (datos, no código)
-datos/agendas/<slug>.md  Agenda de publicación de cada canal (opcional, para el seed)
+datos/red.json           Superadmins de la red
+datos/canales/*.json     Configuración de cada canal, su equipo inicial y la ruta de su agenda
+docs/AGENDA_*.md         Agendas de publicación (las importa el seed)
 prisma/                  Esquema y migraciones
 scripts/                 seed, alta de usuarios, importador de agenda, MySQL local
 src/auth.ts              Auth.js (solo entran usuarios dados de alta)
-src/proxy.ts             Comprobación optimista de sesión
-src/lib/dominio/         Reglas puras: roles, estados, fechas, config de canal
+src/proxy.ts             Proxy (middleware): sesión real + roles por ruta, en el servidor
+src/lib/dominio/         Reglas puras: roles, estados, rutas, calendario, fechas, config de canal
 src/lib/agenda/          Lector e importador de agendas en Markdown
 src/server/acceso.ts     Capa de acceso: toda consulta filtra por canales del usuario
-src/app/                 Login, vista «Red» y vista de canal
+src/server/acciones/     Server actions (crear canal, equipo); vuelven a validar permisos
+src/app/                 Login, «Red», «Nuevo canal» y las secciones de cada canal
 tests/unit, tests/integracion
 ```
 
@@ -56,6 +66,7 @@ tests/unit, tests/integracion
   | Programar y publicar | ✅ | — | — | — |
   | Gestionar miembros y configurar canal | ✅ | — | — | — |
 
+- **Roles aplicados en dos capas del servidor.** El proxy (`src/proxy.ts`) lee la sesión real en la base y corta por ruta: sin sesión, al login; `/canales/*`, solo superadmin; `/c/<slug>/*`, solo miembros de ese canal. Después, cada consulta y cada acción vuelve a comprobar el permiso concreto en `src/server/acceso.ts`. Así, por ejemplo, un productor ve el equipo pero no puede cambiarlo.
 - **Flujo de estados:** idea → guion → verificación → producción → revisión → aprobado → programado → publicado.
   - Se avanza de un paso en un paso.
   - Retroceder está permitido, salvo desde «publicado».
@@ -104,19 +115,27 @@ Sin `SMTP_HOST`, el enlace de acceso **se imprime en la consola del servidor** (
 | `npm run test:integracion` | Pruebas contra un MySQL real y efímero (la primera vez descarga MySQL) |
 | `npm run typecheck` · `npm run lint` | Tipos y lint |
 | `npm run db:migrar` | Aplica migraciones (`prisma migrate deploy`) |
-| `npm run db:seed` | Canales de `datos/canales`, sus agendas y el superadmin |
+| `npm run db:seed` | Superadmins (`datos/red.json`), canales de `datos/canales`, su equipo y su agenda |
+| `npm run build:hostinger` | Migraciones + seed + build (lo usa Hostinger en cada despliegue) |
 | `npm run db:local` | MySQL efímero con migraciones y seed |
 | `npm run usuario:crear -- --email x@y.com [--nombre "…"] [--canal slug --rol productor] [--superadmin]` | Alta de usuario y rol |
 | `npm run agenda:importar -- --canal slug --archivo AGENDA.md [--anio 2026] [--simular]` | Importa una agenda; `--simular` solo muestra lo que leería |
 
 ## Añadir un canal
 
-1. Crea `datos/canales/<slug>.json` con la misma forma que los existentes. La validación está en `src/lib/dominio/canal-config.ts`.
-2. Opcional: añade su agenda en `datos/agendas/<slug>.md`.
-3. Ejecuta `npm run db:seed`, que es idempotente.
-4. Asigna el equipo con `npm run usuario:crear -- --email … --canal <slug> --rol …`.
+**Desde el panel (recomendado).** Un superadmin entra en **+ Nuevo canal**, completa nombre, zona horaria, hora y días de publicación, color de acento y pilares, y el canal se crea vacío. Después da acceso a su equipo desde **Equipo**.
 
-**Formato de agenda.** Se acepta una tabla Markdown con columnas como `Fecha | Título | Pilar | Gancho`, o secciones `## Video N · Título` con líneas `Fecha:`, `Pilar:` y `Gancho:`. La hora de publicación y la zona horaria salen del canal. Las fechas sin año necesitan `--anio` (o `AGENDA_ANIO`). El importador no inventa datos: lo que no puede leer lo reporta como aviso.
+**Por datos (para cargarlo con agenda).**
+1. Crea `datos/canales/<slug>.json` con la misma forma que los existentes. Admite `agenda` (ruta a un `.md`) y `equipo` (`[{ "email", "rol" }]`).
+2. Ejecuta `npm run db:seed`, que es idempotente: crea o actualiza, nunca duplica.
+
+**Formato de agenda.** Se acepta una tabla Markdown con columnas como `Fecha | Pilar | Video | Estado | Notas`, o secciones `## Video N · Título` con líneas `Fecha:`, `Pilar:` y `Gancho:`. Fechas como `2026-10-21`, `21/10/2026` o `Mié 21-oct`. Para las fechas sin año, el año sale de una línea `Año: 2026` en el documento, de `--anio` o de `AGENDA_ANIO`.
+
+- La hora de publicación y la zona horaria salen del canal.
+- El estado inicial puede ser cualquiera hasta «revision». Los estados que exigen aprobación humana (aprobado, programado, publicado) nunca se importan.
+- El importador no inventa datos: lo que no puede leer lo reporta como aviso.
+
+**Carga inicial actual.** El seed crea el canal #1 con los 16 videos de `docs/AGENDA_PUBLICACION_10_VIDEOS.md`. *Gota a gota*, marcado «listo» en la agenda, entra en «revision»; los demás, en «idea». También crea los superadmins de `datos/red.json` y los productores del canal.
 
 ## Variables de entorno
 
@@ -129,7 +148,7 @@ Detalle en [`.env.example`](.env.example).
 | `AUTH_URL` | ✅ en producción | URL pública del panel |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | ✅ en producción | SMTP de Hostinger (`smtp.hostinger.com`, puerto 465) |
 | `EMAIL_FROM` | ✅ en producción | Remitente del correo de acceso |
-| `SUPERADMIN_EMAIL` | para el seed | Primer superadmin de red |
+| `SUPERADMIN_EMAIL` | opcional | Superadmin extra para el seed (además de `datos/red.json`) |
 | `AGENDA_ANIO` | opcional | Año para fechas de agenda sin año |
 | `PANEL_NOMBRE`, `PANEL_COLOR_ACENTO` | opcional | Identidad neutra del panel |
 | `DB_LOCAL_PUERTO` | opcional | Puerto de `db:local` (3307) |
@@ -144,7 +163,7 @@ El hosting compartido tiene una glibc antigua: los binarios nativos de Next no c
 Prisma 7 usa un adaptador JavaScript (`mariadb`), así que no depende de motores nativos.
 
 1. Crea en hPanel la base MySQL y el buzón SMTP.
-2. Carga **todas** las variables de entorno en el sitio Node.js **antes** del build.
-3. Sube el código y compila con Node 24, `app_type: next` y `build_script: build`. Para generar el zip: `git archive HEAD --format=zip -o panel-src.zip`.
-4. Aplica migraciones y seed una vez: `npm run db:migrar && npm run db:seed` (por SSH o desde una conexión remota a la base).
+2. Carga **todas** las variables de entorno en el sitio Node.js **antes** del build. Al pulsar «Aplicar cambios», hPanel lanza un build solo; no lances otro a la vez, porque uno de los dos falla.
+3. Sube el código y compila con Node 24, `app_type: next` y `build_script: build:hostinger`. Ese script aplica migraciones y el seed (idempotente) antes de `next build`. Para generar el zip: `git archive HEAD --format=zip -o panel-src.zip`.
+4. **Arranque:** `npm start` ejecuta `next start`, que escucha en el puerto de la variable `PORT` que asigna Hostinger (3000 si no existe). Hostinger publica la salida del build y reinicia el proceso Node.
 5. Usa el dominio provisional `*.hostingersite.com`; el definitivo se cambia más adelante en `AUTH_URL`.
