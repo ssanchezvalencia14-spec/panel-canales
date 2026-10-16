@@ -5,11 +5,31 @@
 import NextAuth from "next-auth";
 import Nodemailer from "next-auth/providers/nodemailer";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import type { Adapter } from "next-auth/adapters";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma-global";
 import { configSmtp, enviarEnlaceDeAcceso } from "@/lib/correo";
 
+const base = PrismaAdapter(prisma);
+
+/**
+ * Borrar una sesión que ya no existe no es un error: pasa si la cookie quedó
+ * en el navegador tras cerrar sesión en otro dispositivo o limpiar sesiones.
+ * Sin esto, volver a entrar con ese navegador termina en «Configuration».
+ */
+const adapter: Adapter = {
+  ...base,
+  async deleteSession(token) {
+    try {
+      await base.deleteSession!(token);
+    } catch (e) {
+      if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025")) throw e;
+    }
+  },
+};
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  adapter,
   session: { strategy: "database", maxAge: 30 * 24 * 60 * 60 },
   trustHost: true,
   providers: [

@@ -29,7 +29,9 @@ function Enlace({ href, activo, children }: { href: string; activo: boolean; chi
 export function BarraLateral({ esSuperadmin, canales }: { esSuperadmin: boolean; canales: { slug: string }[] }) {
   const segmentos = useSelectedLayoutSegments();
   const enCanal = segmentos[0] === "c" ? segmentos[1] : null;
-  const seccion = enCanal ? (segmentos[2] ?? "calendario") : null;
+  const crudo = enCanal ? (segmentos[2] ?? "calendario") : null;
+  // Integraciones cuelga de Estadísticas.
+  const seccion = crudo === "integraciones" ? "estadisticas" : crudo;
   // Fuera de un canal, las secciones apuntan al primer canal visible.
   const slug = enCanal ?? canales[0]?.slug ?? null;
 

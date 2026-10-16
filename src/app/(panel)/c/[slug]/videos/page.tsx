@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EstadoVideoChip } from "@/components/estado-video";
 import { leerDias, leerPilares } from "@/lib/dominio/canal-config";
@@ -66,7 +67,11 @@ export default async function Videos({ params }: PageProps<"/c/[slug]/videos">) 
                       ? formatearFechaHora(v.fechaPublicacion, canal.zonaHoraria, canal.idioma)
                       : "Sin fecha"}
                   </td>
-                  <td className="px-3 py-2">{v.titulo}</td>
+                  <td className="px-3 py-2">
+                    <Link href={`/c/${canal.slug}/videos/${v.id}`} className="hover:text-acento hover:underline">
+                      {v.titulo}
+                    </Link>
+                  </td>
                   <td className="px-3 py-2 text-suave">{v.pilar ?? "—"}</td>
                   <td className="px-3 py-2">
                     <EstadoVideoChip estado={v.estado} />

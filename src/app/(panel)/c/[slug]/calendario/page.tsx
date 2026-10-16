@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { construirMes, diasProduccion, esMesValido, mesVecino } from "@/lib/dominio/calendario";
+import { construirMes, diasProduccion, esMesValido, mesVecino, sumarDias } from "@/lib/dominio/calendario";
 import { fechaLocal } from "@/lib/dominio/fechas";
 import { prisma } from "@/server/db";
 import { listarVideosDeCanal, obtenerCanalPorSlug } from "@/server/acceso";
+import { eventosDeCanal } from "@/server/metricas";
 import { requireUsuario } from "@/server/sesion";
 
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -19,7 +20,15 @@ export default async function Calendario({ params, searchParams }: PageProps<"/c
   const mes = typeof mesParam === "string" && esMesValido(mesParam) ? mesParam : hoy.slice(0, 7);
   const videos = await listarVideosDeCanal(prisma, usuario, canal.id);
   const diasAntes = diasProduccion(canal.reglas);
-  const semanas = construirMes(mes, videos, canal.zonaHoraria, diasAntes);
+  // Margen de una semana a cada lado: la grilla muestra días de los meses vecinos.
+  const reuniones = await eventosDeCanal(
+    prisma,
+    usuario,
+    canal.id,
+    new Date(`${sumarDias(`${mes}-01`, -7)}T00:00:00Z`),
+    new Date(`${sumarDias(`${mesVecino(mes, 1)}-01`, 7)}T00:00:00Z`),
+  );
+  const semanas = construirMes(mes, videos, canal.zonaHoraria, diasAntes, reuniones);
   const titulo = new Intl.DateTimeFormat(canal.idioma, { month: "long", year: "numeric", timeZone: "UTC" }).format(
     new Date(`${mes}-01T00:00:00Z`),
   );
@@ -47,6 +56,9 @@ export default async function Calendario({ params, searchParams }: PageProps<"/c
           <li className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-sm border border-acento" /> Producción ({diasAntes} días antes)
           </li>
+          <li className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-zinc-600" /> Reunión (Google Calendar)
+          </li>
         </ul>
       </div>
 
@@ -69,9 +81,13 @@ export default async function Calendario({ params, searchParams }: PageProps<"/c
                 {dia.eventos.map((e) => (
                   <li
                     key={`${e.tipo}-${e.videoId}`}
-                    title={`${e.tipo === "publicacion" ? "Publicación" : "Producción"}: ${e.titulo}`}
+                    title={`${{ publicacion: "Publicación", produccion: "Producción", reunion: "Reunión" }[e.tipo]}: ${e.titulo}`}
                     className={`truncate rounded px-1 py-0.5 ${
-                      e.tipo === "publicacion" ? "bg-acento font-medium text-fondo" : "border border-acento text-acento"
+                      e.tipo === "publicacion"
+                        ? "bg-acento font-medium text-fondo"
+                        : e.tipo === "produccion"
+                          ? "border border-acento text-acento"
+                          : "bg-zinc-700 text-zinc-100"
                     }`}
                   >
                     {e.titulo}

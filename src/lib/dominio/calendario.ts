@@ -3,9 +3,12 @@
 
 import { fechaLocal } from "./fechas";
 
-export type TipoEvento = "publicacion" | "produccion";
+export type TipoEvento = "publicacion" | "produccion" | "reunion";
 
 export type EventoCalendario = { tipo: TipoEvento; videoId: string; titulo: string };
+
+/** Evento leído de Google Calendar (reuniones y otros). */
+export type Reunion = { id: string; titulo: string; inicio: Date; todoElDia: boolean };
 
 export type DiaCalendario = {
   fecha: string; // YYYY-MM-DD
@@ -42,6 +45,7 @@ export function construirMes(
   videos: ReadonlyArray<{ id: string; titulo: string; fechaPublicacion: Date | null }>,
   zona: string,
   diasAntes: number,
+  reuniones: readonly Reunion[] = [],
 ): DiaCalendario[][] {
   if (!esMesValido(mes)) throw new Error(`Mes inválido: «${mes}» (se espera AAAA-MM)`);
 
@@ -52,6 +56,12 @@ export function construirMes(
     const dia = fechaLocal(v.fechaPublicacion, zona);
     agregar(dia, { tipo: "publicacion", videoId: v.id, titulo: v.titulo });
     if (diasAntes > 0) agregar(sumarDias(dia, -diasAntes), { tipo: "produccion", videoId: v.id, titulo: v.titulo });
+  }
+
+  for (const r of reuniones) {
+    // Los eventos de día completo se guardan a medianoche UTC de su fecha.
+    const dia = r.todoElDia ? r.inicio.toISOString().slice(0, 10) : fechaLocal(r.inicio, zona);
+    agregar(dia, { tipo: "reunion", videoId: r.id, titulo: r.titulo });
   }
 
   const primero = `${mes}-01`;

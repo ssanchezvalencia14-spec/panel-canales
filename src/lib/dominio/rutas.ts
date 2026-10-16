@@ -15,6 +15,8 @@ export function requisitoDeRuta(pathname: string): Requisito {
   if (pathname === "/login" || pathname.startsWith("/login/") || pathname.startsWith("/api/auth/")) {
     return { tipo: "publica" };
   }
+  // El cron no tiene sesión: la ruta exige su propio secreto (CRON_SECRET).
+  if (pathname.startsWith("/api/cron/")) return { tipo: "publica" };
   if (pathname === "/canales" || pathname.startsWith("/canales/")) return { tipo: "superadmin" };
   const canal = /^\/c\/([^/]+)(?:\/|$)/.exec(pathname);
   if (canal) return { tipo: "canal", slug: decodeURIComponent(canal[1]) };

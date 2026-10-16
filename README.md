@@ -8,7 +8,7 @@ Plan completo por fases: [`docs/PLAN_PANEL_CANALES.pdf`](docs/PLAN_PANEL_CANALES
 
 ## Estado
 
-**Fase 0 · Fundamentos** y **Fase 1 · Panel base** hechas. Desplegado en el dominio provisional de Hostinger.
+**Fases 0, 1 y 2** hechas. Desplegado en el dominio provisional de Hostinger.
 
 | Entregable | Estado |
 |---|---|
@@ -23,7 +23,47 @@ Plan completo por fases: [`docs/PLAN_PANEL_CANALES.pdf`](docs/PLAN_PANEL_CANALES
 | Seed: canal #1, superadmin, productores, 16 videos de la agenda | ✅ |
 | Build para Hostinger Node.js | ✅ |
 
-Pendiente para fases siguientes: mover videos en el tablero (arrastrar y soltar), ficha de cada video, registro de actividad, eventos de reunión en el calendario y métricas reales (Fase 2).
+| **Fase 2 · Datos y estadísticas** | |
+| Ficha de cada video con sus publicaciones (YouTube, Shorts, TikTok) | ✅ |
+| Métricas por formulario y por CSV (YouTube Studio, TikTok Studio u hoja propia) | ✅ |
+| YouTube Analytics por video: vistas, retención, likes, comentarios, compartidos, suscriptores | ✅ (requiere credenciales de Google) |
+| Google Calendar: escribe publicación y producción, lee reuniones | ✅ (requiere credenciales de Google) |
+| Gráficos y tablero de resultados: mejor pilar, hora y día; comparación de ganchos | ✅ |
+| Exportación a CSV | ✅ |
+
+Pendiente para fases siguientes: mover videos en el tablero (arrastrar y soltar), registro de actividad y edición de la ficha del video.
+
+## Datos y estadísticas (Fase 2)
+
+- **Publicaciones.** En la ficha de cada video se registra el enlace publicado. El panel reconoce YouTube (watch, youtu.be, shorts) y TikTok, y guarda el id de la plataforma. Un mismo enlace no puede estar en dos videos.
+- **Métricas.** Cada medición es una **foto acumulada** a una fecha: los totales desde que se publicó, como los muestra la plataforma. El total de un video es la última foto de cada publicación. Las vistas, likes y demás se suman; la retención y el CTR se ponderan por vistas. Las mediciones entran de tres formas:
+  - **Formulario** en la ficha del video.
+  - **CSV** en Estadísticas → Cargar métricas. Sirven el export de YouTube Studio, el de TikTok Studio o una hoja propia, con encabezados en español o inglés. Cada fila se asocia por enlace o id; si no hay, por título, solo si coincide con un único video del canal. Lo que no se puede asociar se lista y no se guarda.
+  - **YouTube Analytics**, con Google conectado.
+- **Lo que no da la API de YouTube.** Impresiones y CTR de miniaturas no están en la API de YouTube Analytics. El CTR se carga con el CSV de YouTube Studio.
+- **Resultados.** Vistas promedio por pilar, por hora y por día de publicación, en la zona horaria del canal, y una tabla de ganchos con su puntaje frente a vistas y retención. Son promedios descriptivos, no predicciones. Con menos de 5 videos medidos, el panel lo advierte.
+- **Exportar CSV.** Una fila por publicación con su última medición, en UTF-8 con BOM (abre bien en Excel). Las celdas que empiezan por `=`, `+`, `-` o `@` se neutralizan para evitar fórmulas.
+
+### Conectar Google (YouTube + Calendar)
+
+1. En [Google Cloud Console](https://console.cloud.google.com/), crea un proyecto y activa **YouTube Data API v3**, **YouTube Analytics API** y **Google Calendar API**.
+2. Configura la pantalla de consentimiento (tipo *Externo*) y añade como usuarios de prueba las cuentas que conectarán canales. Mientras la app esté en modo *Testing*, Google vence el permiso a los 7 días y hay que reconectar; para evitarlo, publica la app.
+3. Crea credenciales **ID de cliente OAuth → Aplicación web**, con la URI de redirección `https://<dominio>/api/integraciones/google/callback`.
+4. En las variables del sitio, añade `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `INTEGRACIONES_CLAVE` y `CRON_SECRET` desde hPanel. No uses el reemplazo por API, que borra las demás.
+5. Un admin del canal entra en **Estadísticas → Conectar Google** con la cuenta dueña del canal de YouTube. El permiso se guarda **cifrado** (AES-256-GCM) y se revoca al desconectar.
+6. Sincroniza con **Sincronizar ahora**, o programa el cron del hosting:
+
+   ```bash
+   curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<dominio>/api/cron/sincronizar
+   ```
+
+Cada sincronización:
+- empareja los videos subidos con los del panel por título, solo si la coincidencia es única;
+- guarda la foto de métricas del día;
+- crea o actualiza en Google Calendar los eventos de publicación y de producción, marcados como del panel;
+- lee las reuniones del calendario (30 días atrás y 120 adelante).
+
+Cada corrida queda en la tabla `ejecuciones` con su log, y el último error se muestra en la página de integraciones.
 
 ## Stack
 
@@ -150,6 +190,9 @@ Detalle en [`.env.example`](.env.example).
 | `EMAIL_FROM` | ✅ en producción | Remitente del correo de acceso |
 | `SUPERADMIN_EMAIL` | opcional | Superadmin extra para el seed (además de `datos/red.json`) |
 | `AGENDA_ANIO` | opcional | Año para fechas de agenda sin año |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | para Google | Credenciales OAuth (YouTube Analytics + Calendar) |
+| `INTEGRACIONES_CLAVE` | para Google | 32 bytes en base64; cifra los permisos de Google guardados |
+| `CRON_SECRET` | para el cron | Secreto de `/api/cron/sincronizar` (mín. 16 caracteres) |
 | `PANEL_NOMBRE`, `PANEL_COLOR_ACENTO` | opcional | Identidad neutra del panel |
 | `DB_LOCAL_PUERTO` | opcional | Puerto de `db:local` (3307) |
 

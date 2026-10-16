@@ -11,6 +11,9 @@ describe("reglas de acceso por ruta (proxy)", () => {
     expect(requisitoDeRuta("/c/canal-a")).toEqual({ tipo: "canal", slug: "canal-a" });
     expect(requisitoDeRuta("/c/canal-a/equipo")).toEqual({ tipo: "canal", slug: "canal-a" });
     expect(requisitoDeRuta("/loginx")).toEqual({ tipo: "sesion" });
+    expect(requisitoDeRuta("/api/cron/sincronizar")).toEqual({ tipo: "publica" });
+    expect(requisitoDeRuta("/api/integraciones/google/iniciar")).toEqual({ tipo: "sesion" });
+    expect(requisitoDeRuta("/c/canal-a/estadisticas/exportar")).toEqual({ tipo: "canal", slug: "canal-a" });
   });
 
   const miembroA = { esSuperadmin: false, slugs: ["canal-a"] };

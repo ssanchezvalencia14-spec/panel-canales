@@ -73,8 +73,9 @@ model User {
   accounts        Account[]
   sessions        Session[]
   membresias      Membresia[]
-  videosAprobados Video[]     @relation("VideoAprobadoPor")
-  tareasAsignadas Tarea[]     @relation("TareaResponsable")
+  videosAprobados Video[]       @relation("VideoAprobadoPor")
+  tareasAsignadas Tarea[]       @relation("TareaResponsable")
+  integraciones   Integracion[] @relation("IntegracionConectadaPor")
 
   @@map("users")
 }
@@ -165,6 +166,8 @@ model Canal {
   publicaciones Publicacion[]
   metricas      Metrica[]
   ejecuciones   Ejecucion[]
+  integraciones Integracion[]
+  eventos       EventoCalendario[]
 
   @@map("canales")
 }
@@ -188,12 +191,13 @@ model Video {
   creadoEn         DateTime    @default(now()) @map("creado_en")
   actualizadoEn    DateTime    @updatedAt @map("actualizado_en")
 
-  canal         Canal         @relation(fields: [canalId], references: [id], onDelete: Cascade)
-  aprobadoPor   User?         @relation("VideoAprobadoPor", fields: [aprobadoPorId], references: [id], onDelete: SetNull)
+  canal         Canal              @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  aprobadoPor   User?              @relation("VideoAprobadoPor", fields: [aprobadoPorId], references: [id], onDelete: SetNull)
   tareas        Tarea[]
   activos       Activo[]
   publicaciones Publicacion[]
   ejecuciones   Ejecucion[]
+  eventos       EventoCalendario[]
 
   @@unique([canalId, id])
   @@index([canalId, fechaPublicacion])
@@ -247,6 +251,8 @@ model Publicacion {
   videoId    String     @map("video_id")
   plataforma Plataforma
   url        String?    @db.Text
+  /// Identificador en la plataforma (id de video de YouTube o de TikTok).
+  externoId  String?    @map("externo_id") @db.VarChar(64)
   programada DateTime?
   publicada  DateTime?
   creadoEn   DateTime   @default(now()) @map("creado_en")
@@ -256,15 +262,18 @@ model Publicacion {
   metricas Metrica[]
 
   @@unique([canalId, id])
+  @@unique([canalId, plataforma, externoId])
   @@index([canalId, videoId])
   @@map("publicaciones")
 }
 
+/// Foto acumulada de una publicación a una fecha: cada fila guarda los totales
+/// desde que se publicó hasta `fecha` (no los del día). El último registro es el total.
 model Metrica {
-  id            String   @id @default(cuid())
-  canalId       String   @map("canal_id")
-  publicacionId String   @map("publicacion_id")
-  fecha         DateTime @db.Date
+  id            String        @id @default(cuid())
+  canalId       String        @map("canal_id")
+  publicacionId String        @map("publicacion_id")
+  fecha         DateTime      @db.Date
   vistas        Int?
   /// Retención media en porcentaje (0-100).
   retencion     Float?
@@ -272,6 +281,11 @@ model Metrica {
   ctr           Float?
   likes         Int?
   comentarios   Int?
+  compartidos   Int?
+  /// Suscriptores ganados atribuidos a la publicación.
+  suscriptores  Int?
+  fuente        FuenteMetrica @default(manual)
+  actualizadoEn DateTime      @default(now()) @updatedAt @map("actualizado_en")
 
   canal       Canal       @relation(fields: [canalId], references: [id], onDelete: Cascade)
   publicacion Publicacion @relation(fields: [canalId, publicacionId], references: [canalId, id], onDelete: Cascade)
@@ -279,6 +293,74 @@ model Metrica {
   @@unique([publicacionId, fecha])
   @@index([canalId, fecha])
   @@map("metricas")
+}
+
+enum FuenteMetrica {
+  youtube_api
+  csv
+  manual
+}
+
+// ─────────────────────────── Integraciones ───────────────────────────
+
+enum ProveedorIntegracion {
+  google
+}
+
+/// Conexión de un canal con un servicio externo (Google: YouTube Analytics + Calendar).
+/// El refresh token se guarda cifrado (AES-256-GCM) con INTEGRACIONES_CLAVE.
+model Integracion {
+  id                   String               @id @default(cuid())
+  canalId              String               @map("canal_id")
+  proveedor            ProveedorIntegracion
+  /// Cuenta o canal conectado (para mostrar), p. ej. el nombre del canal de YouTube.
+  cuenta               String?
+  youtubeCanalId       String?              @map("youtube_canal_id") @db.VarChar(64)
+  calendarioId         String               @default("primary") @map("calendario_id")
+  refreshTokenCifrado  String               @map("refresh_token_cifrado") @db.Text
+  alcances             String               @db.Text
+  conectadoPorId       String?              @map("conectado_por_id")
+  ultimaSincronizacion DateTime?            @map("ultima_sincronizacion")
+  ultimoError          String?              @map("ultimo_error") @db.Text
+  creadoEn             DateTime             @default(now()) @map("creado_en")
+  actualizadoEn        DateTime             @updatedAt @map("actualizado_en")
+
+  canal        Canal @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  conectadoPor User? @relation("IntegracionConectadaPor", fields: [conectadoPorId], references: [id], onDelete: SetNull)
+
+  @@unique([canalId, proveedor])
+  @@map("integraciones")
+}
+
+enum OrigenEvento {
+  panel
+  google
+}
+
+/// Eventos del calendario del canal. Los de origen «panel» (publicación,
+/// producción) se escriben en Google Calendar; los de origen «google»
+/// (reuniones y otros) se leen de allí.
+model EventoCalendario {
+  id            String       @id @default(cuid())
+  canalId       String       @map("canal_id")
+  origen        OrigenEvento
+  /// publicacion | produccion | reunion
+  tipo          String       @db.VarChar(20)
+  videoId       String?      @map("video_id")
+  googleEventId String?      @map("google_event_id") @db.VarChar(255)
+  titulo        String       @db.VarChar(300)
+  inicio        DateTime
+  fin           DateTime?
+  todoElDia     Boolean      @default(false) @map("todo_el_dia")
+  actualizadoEn DateTime     @updatedAt @map("actualizado_en")
+
+  canal Canal  @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  video Video? @relation(fields: [canalId, videoId], references: [canalId, id], onDelete: Cascade)
+
+  @@unique([canalId, googleEventId])
+  @@unique([canalId, videoId, tipo])
+  @@index([canalId, inicio])
+  @@map("eventos_calendario")
 }
 
 model Ejecucion {
