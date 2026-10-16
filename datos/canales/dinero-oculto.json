@@ -54,7 +54,11 @@
       ],
       "cierreTiktok": "Video completo en YouTube: el enlace está en la bio.",
       "contenidoSintetico": false
-    }
+    },
+    "colchonMinimo": 2,
+    "diasAvisoCifras": 7,
+    "limiteGastoInvestigacion": 3,
+    "investigacionSemanal": true
   },
   "limiteGastoVideo": null,
   "agenda": "docs/AGENDA_PUBLICACION_10_VIDEOS.md",

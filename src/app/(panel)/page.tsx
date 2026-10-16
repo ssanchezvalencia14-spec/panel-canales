@@ -6,10 +6,12 @@ import { acentoPanel } from "@/lib/panel";
 import { prisma } from "@/server/db";
 import { resumenRed } from "@/server/acceso";
 import { requireUsuario } from "@/server/sesion";
+import { alertasAbiertasPorCanal } from "@/server/automatizaciones";
 
 export default async function VistaRed({ searchParams }: PageProps<"/">) {
   const usuario = await requireUsuario();
   const resumen = await resumenRed(prisma, usuario);
+  const alertas = await alertasAbiertasPorCanal(prisma, resumen.map((r) => r.canal.id));
   const { aviso } = await searchParams;
 
   return (
@@ -51,6 +53,13 @@ export default async function VistaRed({ searchParams }: PageProps<"/">) {
                   <span aria-hidden className="h-3 w-3 rounded-full bg-acento" />
                   <h2 className="font-semibold">{canal.nombre}</h2>
                   <span className="ml-auto text-sm text-suave">{total} videos</span>
+                  {(alertas.get(canal.id)?.total ?? 0) > 0 && (
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-xs ${alertas.get(canal.id)!.graves ? "border-red-800 text-red-300" : "border-amber-800 text-amber-300"}`}
+                    >
+                      {alertas.get(canal.id)!.total} alerta(s)
+                    </span>
+                  )}
                 </div>
                 <dl className="mt-4 grid grid-cols-4 gap-2 text-center text-xs">
                   {ESTADOS_VIDEO.map((e) => (

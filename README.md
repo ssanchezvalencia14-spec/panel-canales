@@ -8,7 +8,7 @@ Plan completo por fases: [`docs/PLAN_PANEL_CANALES.pdf`](docs/PLAN_PANEL_CANALES
 
 ## Estado
 
-**Fases 0 a 4** hechas. Desplegado en el dominio provisional de Hostinger.
+**Fases 0 a 5** hechas. Desplegado en el dominio provisional de Hostinger.
 
 | Entregable | Estado |
 |---|---|
@@ -47,7 +47,12 @@ Plan completo por fases: [`docs/PLAN_PANEL_CANALES.pdf`](docs/PLAN_PANEL_CANALES
 | Aviso por correo al equipo al programar y al publicar | ✅ (requiere SMTP) |
 | Confirmación explícita en pantalla y registro de actividad en cada paso que publica | ✅ |
 
-Pendiente para fases siguientes: arrastrar y soltar en el tablero.
+| **Fase 5 · Automatizaciones y reportes** | |
+| Alertas: video atrasado (producción o publicación), falta de colchón y cifras sin verificar, con historial y aviso a los admins | ✅ |
+| Resumen semanal automático en borrador, que un admin aprueba y envía al equipo | ✅ |
+| Investigación semanal de referencias (búsqueda web con Claude e insumo de vidIQ) guardada como informe | ✅ (requiere `ANTHROPIC_API_KEY`) |
+
+Pendiente para fases siguientes: arrastrar y soltar en el tablero (Fase 6: endurecimiento).
 
 ## Datos y estadísticas (Fase 2)
 
@@ -97,6 +102,32 @@ Todo paso que publica muestra en pantalla qué va a pasar y exige marcar «Confi
 - **Avisos al equipo.** Correo con copia oculta a todos los miembros activos del canal, por el mismo SMTP del login. Si falla, el paso no se revierte y la falla queda en la actividad.
 
 > **Permisos de Google:** desde esta fase la conexión pide además `youtube` (gestión) y `drive.file`. Un canal conectado antes debe **volver a conectar Google** en Integraciones. Si el proyecto de Google Cloud no está verificado, Google puede limitar lo que la API hace con los videos; en ese caso hay que pasar la verificación de la app.
+
+## Automatizaciones y reportes (Fase 5)
+
+En la sección **Informes** de cada canal, y en la vista Red con el número de alertas abiertas por canal:
+
+- **Alertas.** Las abre y cierra el cron diario, y también se revisan con «Revisar ahora». Quedan como historial (abierta → cerrada), y las nuevas se avisan por correo a los admins del canal y a los superadmins. Son cuatro:
+  - **Atraso de producción:** llegó el día de producción (`diasProduccionAntes`) y el video no está en Producción.
+  - **Publicación atrasada:** pasó la fecha y no está programado ni publicado.
+  - **Falta de colchón:** hay menos videos aprobados o programados por publicar que `colchonMinimo` (2 por defecto).
+  - **Cifras sin verificar:** hay cifras pendientes en un video que se publica dentro de `diasAvisoCifras` días, o un video en Producción o después sin fuentes verificadas.
+- **Resumen semanal.** El cron semanal lo genera en **borrador** y avisa a los admins. Trae lo publicado en la semana con sus vistas, los próximos 7 días, el estado de la producción, las alertas abiertas, los más vistos y el gasto. Un admin lo revisa, puede editarlo y lo **aprueba y envía** con confirmación explícita. Queda en la actividad, y una vez enviado no se regenera.
+- **Investigación de referencias.** Claude (`claude-opus-5-5`) con **búsqueda web** busca tendencias, referencias e ideas del nicho y entrega un informe con enlaces. Si una búsqueda larga se pausa, el panel la reanuda.
+  - Ninguna cifra sin su enlace.
+  - **vidIQ no tiene API para el panel:** lo exportado de vidIQ se pega como insumo.
+  - Costo: tokens más US$ 0,01 por búsqueda, con tope por informe en `limiteGastoInvestigacion` (US$ 3 por defecto) comprobado antes de gastar. Se desactiva por canal con `investigacionSemanal: false`.
+
+**Cron del hosting** (en hPanel → Avanzado → Tareas Cron), con `CRON_SECRET` definido:
+
+```bash
+# todos los días a las 06:00
+curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<dominio>/api/cron/diario
+# los lunes a las 07:00
+curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<dominio>/api/cron/semanal
+# opcional, cada día: métricas y calendario de Google
+curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<dominio>/api/cron/sincronizar
+```
 
 ### Conectar Google (YouTube + Calendar)
 

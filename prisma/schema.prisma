@@ -70,16 +70,18 @@ model User {
   creadoEn      DateTime  @default(now()) @map("creado_en")
   actualizadoEn DateTime  @updatedAt @map("actualizado_en")
 
-  accounts        Account[]
-  sessions        Session[]
-  membresias      Membresia[]
-  videosAprobados Video[]       @relation("VideoAprobadoPor")
-  tareasAsignadas Tarea[]       @relation("TareaResponsable")
-  integraciones   Integracion[] @relation("IntegracionConectadaPor")
-  ganchosForzados Video[]       @relation("VideoGanchoForzadoPor")
-  ejecuciones     Ejecucion[]   @relation("EjecucionRegistradaPor")
-  guiones         Guion[]       @relation("GuionCreadoPor")
-  actividad       Actividad[]
+  accounts          Account[]
+  sessions          Session[]
+  membresias        Membresia[]
+  videosAprobados   Video[]       @relation("VideoAprobadoPor")
+  tareasAsignadas   Tarea[]       @relation("TareaResponsable")
+  integraciones     Integracion[] @relation("IntegracionConectadaPor")
+  ganchosForzados   Video[]       @relation("VideoGanchoForzadoPor")
+  ejecuciones       Ejecucion[]   @relation("EjecucionRegistradaPor")
+  guiones           Guion[]       @relation("GuionCreadoPor")
+  actividad         Actividad[]
+  informesGenerados Informe[]     @relation("InformeGeneradoPor")
+  informesAprobados Informe[]     @relation("InformeAprobadoPor")
 
   @@map("users")
 }
@@ -174,6 +176,8 @@ model Canal {
   eventos       EventoCalendario[]
   guiones       Guion[]
   actividad     Actividad[]
+  alertas       Alerta[]
+  informes      Informe[]
 
   @@map("canales")
 }
@@ -218,6 +222,7 @@ model Video {
   actualizadoEn         DateTime    @updatedAt @map("actualizado_en")
 
   actividad        Actividad[]
+  alertas          Alerta[]
   canal            Canal              @relation(fields: [canalId], references: [id], onDelete: Cascade)
   aprobadoPor      User?              @relation("VideoAprobadoPor", fields: [aprobadoPorId], references: [id], onDelete: SetNull)
   ganchoForzadoPor User?              @relation("VideoGanchoForzadoPor", fields: [ganchoForzadoPorId], references: [id], onDelete: SetNull)
@@ -461,4 +466,65 @@ model Actividad {
   @@index([canalId, creadoEn])
   @@index([canalId, videoId])
   @@map("actividad")
+}
+
+// ─────────────────────────── Automatizaciones (Fase 5) ───────────────────────────
+
+/// Alertas del canal. Las abre y cierra el cron diario; quedan como historial.
+model Alerta {
+  id           String    @id @default(cuid())
+  canalId      String    @map("canal_id")
+  videoId      String?   @map("video_id")
+  /// atrasado_produccion | atrasado_publicacion | colchon | cifras_sin_verificar
+  tipo         String    @db.VarChar(40)
+  /// Identifica la alerta para no duplicarla mientras siga abierta.
+  clave        String    @db.VarChar(120)
+  mensaje      String    @db.VarChar(500)
+  gravedad     String    @default("aviso") @db.VarChar(10)
+  abiertaEn    DateTime  @default(now()) @map("abierta_en")
+  cerradaEn    DateTime? @map("cerrada_en")
+  notificadaEn DateTime? @map("notificada_en")
+
+  canal Canal  @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  video Video? @relation(fields: [canalId, videoId], references: [canalId, id], onDelete: Cascade)
+
+  @@index([canalId, cerradaEn])
+  @@index([canalId, clave])
+  @@map("alertas")
+}
+
+enum EstadoInforme {
+  borrador
+  enviado
+  error
+}
+
+/// Informes del canal: investigación semanal de referencias y resumen semanal.
+model Informe {
+  id            String        @id @default(cuid())
+  canalId       String        @map("canal_id")
+  /// investigacion | resumen_semanal
+  tipo          String        @db.VarChar(30)
+  /// Semana ISO en la zona del canal, p. ej. 2026-W43.
+  semana        String        @db.VarChar(10)
+  titulo        String        @db.VarChar(200)
+  contenido     String        @db.LongText
+  estado        EstadoInforme @default(borrador)
+  datos         Json?
+  costo         Decimal?      @db.Decimal(10, 4)
+  ejecucionId   String?       @map("ejecucion_id")
+  generadoPorId String?       @map("generado_por_id")
+  aprobadoPorId String?       @map("aprobado_por_id")
+  aprobadoEn    DateTime?     @map("aprobado_en")
+  enviadoEn     DateTime?     @map("enviado_en")
+  creadoEn      DateTime      @default(now()) @map("creado_en")
+  actualizadoEn DateTime      @updatedAt @map("actualizado_en")
+
+  canal       Canal @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  generadoPor User? @relation("InformeGeneradoPor", fields: [generadoPorId], references: [id], onDelete: SetNull)
+  aprobadoPor User? @relation("InformeAprobadoPor", fields: [aprobadoPorId], references: [id], onDelete: SetNull)
+
+  @@unique([canalId, tipo, semana])
+  @@index([canalId, creadoEn])
+  @@map("informes")
 }
