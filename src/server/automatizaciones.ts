@@ -23,7 +23,8 @@ import { combinarMetricas } from "@/lib/metricas/resultados";
 import { AccesoDenegado, NoEncontrado, type UsuarioSesion } from "./acceso";
 import { avisarEquipo, registrarActividad } from "./actividad";
 import { DatoInvalido } from "./metricas";
-import { TIPO_CIFRA, TopeExcedido } from "./produccion";
+import { exigirTopeMensual, TIPO_CIFRA, TopeExcedido } from "./produccion";
+import { log } from "@/lib/log";
 
 function exigir(u: UsuarioSesion, canalId: string, accion: Accion, mensaje?: string) {
   if (!puede(u, canalId, accion)) throw new AccesoDenegado(mensaje);
@@ -239,6 +240,7 @@ export async function generarInvestigacion(
   if (maximo > tope) {
     throw new TopeExcedido(`El peor caso de la investigación (US$ ${maximo.toFixed(2)}) supera el tope del canal (US$ ${tope.toFixed(2)}). Un admin puede subir «limiteGastoInvestigacion».`);
   }
+  await exigirTopeMensual(db, canalId, maximo, ahora);
 
   const ej = await db.ejecucion.create({
     data: { canalId, tipo: "investigacion", estado: "en_curso", registradoPorId: opciones.generadoPorId ?? null, log: `Semana ${semana}. Modelo pedido: ${MODELO_GUION}` },
@@ -305,7 +307,15 @@ export async function obtenerInforme(db: Db, u: UsuarioSesion, canalId: string, 
 export async function tareasDiarias(db: Db, ahora = new Date()) {
   const canales = await db.canal.findMany({ where: { activo: true }, select: { id: true, slug: true } });
   const salida = [];
-  for (const c of canales) salida.push({ canal: c.slug, ...(await sincronizarAlertas(db, c.id, ahora)) });
+  for (const c of canales) {
+    // Un canal que falla no frena a los demás.
+    try {
+      salida.push({ canal: c.slug, ok: true, ...(await sincronizarAlertas(db, c.id, ahora)) });
+    } catch (e) {
+      log.error("cron_diario_canal", { canal: c.slug, error: e });
+      salida.push({ canal: c.slug, ok: false, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
   return salida;
 }
 
@@ -314,7 +324,14 @@ export async function tareasSemanales(db: Db, investigar: Investigador | null, a
   const canales = await db.canal.findMany({ where: { activo: true }, select: { id: true, slug: true, nombre: true, reglas: true } });
   const salida: { canal: string; resumen: string; investigacion: string }[] = [];
   for (const c of canales) {
-    const r = await generarResumenSemanal(db, c.id, ahora);
+    let r: Awaited<ReturnType<typeof generarResumenSemanal>>;
+    try {
+      r = await generarResumenSemanal(db, c.id, ahora);
+    } catch (e) {
+      log.error("cron_semanal_resumen", { canal: c.slug, error: e });
+      salida.push({ canal: c.slug, resumen: `error: ${e instanceof Error ? e.message : e}`, investigacion: "omitida" });
+      continue;
+    }
     let inv = "omitida";
     const quiere = (c.reglas as { investigacionSemanal?: unknown } | null)?.investigacionSemanal !== false;
     if (investigar && quiere) {
@@ -323,6 +340,7 @@ export async function tareasSemanales(db: Db, investigar: Investigador | null, a
         inv = "ok";
       } catch (e) {
         inv = `error: ${e instanceof Error ? e.message : e}`;
+        log.aviso("cron_semanal_investigacion", { canal: c.slug, error: e });
       }
     }
     try {
@@ -331,8 +349,9 @@ export async function tareasSemanales(db: Db, investigar: Investigador | null, a
         asunto: `[${nombrePanel()}] ${r.titulo} listo para revisar · ${c.nombre}`,
         texto: `El resumen semanal quedó en borrador. Revísalo y apruébalo en el panel (Informes) para enviarlo al equipo.${inv === "ok" ? "\nTambién está lista la investigación de referencias de la semana." : ""}`,
       });
-    } catch {
+    } catch (e) {
       // El borrador queda en el panel aunque el aviso no salga.
+      log.aviso("cron_semanal_aviso", { canal: c.slug, error: e });
     }
     salida.push({ canal: c.slug, resumen: r.estado, investigacion: inv });
   }

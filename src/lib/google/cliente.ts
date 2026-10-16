@@ -1,7 +1,15 @@
 // Cliente mínimo de las APIs de Google que usa el panel, sobre fetch.
 // Sin SDK: menos dependencias en el hosting y fácil de probar (fetch inyectable).
 
+import { fetchConReintentos } from "../reintentos";
+
 export type Fetch = typeof fetch;
+
+/** El endpoint de token (refresh) se puede repetir sin efectos; el resto de POST no. */
+const TOKEN_URL = "https://oauth2.googleapis.com/token";
+export function conReintentosGoogle(f: Fetch, esperar?: (ms: number) => Promise<void>): Fetch {
+  return fetchConReintentos(f, { etiqueta: "google", esperar, postIdempotente: (url) => url === TOKEN_URL });
+}
 
 export const ALCANCE = {
   /** Leer y actualizar videos del canal (programar con publishAt). Incluye lectura. */
@@ -92,7 +100,7 @@ export async function intercambiarCodigo(cfg: ConfigOAuth, code: string, f: Fetc
 
 export async function tokenDeAcceso(cfg: ConfigOAuth, refreshToken: string, f: Fetch = fetch): Promise<string> {
   const t = await json<Tokens>(
-    await f("https://oauth2.googleapis.com/token", {
+    await conReintentosGoogle(f)(TOKEN_URL, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -113,10 +121,15 @@ export async function revocar(token: string, f: Fetch = fetch): Promise<void> {
 // ─────────────────────────── APIs con token ───────────────────────────
 
 export class Google {
+  private readonly f: Fetch;
   constructor(
     private readonly token: string,
-    private readonly f: Fetch = fetch,
-  ) {}
+    f: Fetch = fetch,
+    esperar?: (ms: number) => Promise<void>,
+  ) {
+    // Lecturas y actualizaciones se reintentan ante 429/5xx; las creaciones (POST) no, para no duplicar.
+    this.f = conReintentosGoogle(f, esperar);
+  }
 
   private async pedir<T>(url: string, init: RequestInit = {}): Promise<T> {
     return json<T>(

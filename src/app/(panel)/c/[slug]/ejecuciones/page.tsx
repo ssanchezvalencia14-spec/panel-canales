@@ -5,8 +5,8 @@ import { FormularioEjecucion, TablaEjecuciones } from "@/components/produccion-v
 import { puede } from "@/lib/dominio/roles";
 import { prisma } from "@/server/db";
 import { listarVideosDeCanal, obtenerCanalPorSlug } from "@/server/acceso";
-import { topeCanalAccion } from "@/server/acciones/produccion";
-import { listarEjecuciones } from "@/server/produccion";
+import { topeCanalAccion, topeMensualAccion } from "@/server/acciones/produccion";
+import { gastoMensualCanal, listarEjecuciones, NOMBRE_TIPO_EJECUCION } from "@/server/produccion";
 import { requireUsuario } from "@/server/sesion";
 import { listarActividad } from "@/server/actividad";
 
@@ -18,11 +18,13 @@ export default async function Ejecuciones({ params }: PageProps<"/c/[slug]/ejecu
   const canal = await obtenerCanalPorSlug(prisma, usuario, slug);
   if (!canal) notFound();
 
-  const [ejecuciones, videos, actividad] = await Promise.all([
+  const [ejecuciones, videos, actividad, mes] = await Promise.all([
     listarEjecuciones(prisma, usuario, canal.id),
     listarVideosDeCanal(prisma, usuario, canal.id),
     listarActividad(prisma, canal.id, undefined, 100),
+    gastoMensualCanal(prisma, usuario, canal.id),
   ]);
+  const usoMes = mes.tope ? Math.min(100, (mes.gastado / mes.tope) * 100) : null;
   const edita = puede(usuario, canal.id, "editar_video");
   const admin = puede(usuario, canal.id, "configurar_canal");
   const tope = canal.limiteGastoVideo === null ? null : Number(canal.limiteGastoVideo);
@@ -62,6 +64,50 @@ export default async function Ejecuciones({ params }: PageProps<"/c/[slug]/ejecu
           )}
           <p className="mt-2 text-xs text-suave">Un admin puede fijar un tope distinto para un video en su ficha. Lo que supere el tope no se registra.</p>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-borde bg-superficie p-4">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <h2 className="font-semibold">Gasto del mes {mes.mes}</h2>
+          <p className="text-2xl font-semibold tabular-nums">
+            {usd(mes.gastado)}
+            <span className="text-base font-normal text-suave"> / {mes.tope === null ? "sin tope mensual" : usd(mes.tope)}</span>
+          </p>
+        </div>
+        {usoMes !== null && (
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-borde" role="meter" aria-valuenow={Math.round(usoMes)} aria-valuemin={0} aria-valuemax={100} aria-label="Uso del tope mensual">
+            <div className={`h-full rounded-full ${usoMes >= 90 ? "bg-red-500" : usoMes >= 70 ? "bg-amber-400" : "bg-acento"}`} style={{ width: `${usoMes}%` }} />
+          </div>
+        )}
+        {mes.porTipo.length > 0 && (
+          <table className="mt-3 w-full max-w-lg text-sm">
+            <thead className="text-left text-xs text-suave">
+              <tr>
+                <th className="py-1 font-normal">Tipo</th>
+                <th className="py-1 text-right font-normal">Ejecuciones</th>
+                <th className="py-1 text-right font-normal">Gasto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mes.porTipo.map((g) => (
+                <tr key={g.tipo} className="border-t border-borde">
+                  <td className="py-1">{NOMBRE_TIPO_EJECUCION[g.tipo] ?? g.tipo}</td>
+                  <td className="py-1 text-right tabular-nums">{g.cantidad}</td>
+                  <td className="py-1 text-right tabular-nums">{usd(g.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {admin && (
+          <FormularioAccion accion={topeMensualAccion.bind(null, canal.slug)} boton="Guardar tope mensual" variante="secundario" className="mt-3 flex flex-wrap items-end gap-2">
+            <label className="text-sm">
+              Tope mensual del canal (USD, vacío = sin tope)
+              <input name="tope" type="number" min="0" step="0.01" defaultValue={mes.tope ?? ""} className={`${claseCampo} mt-1 w-40`} />
+            </label>
+          </FormularioAccion>
+        )}
+        <p className="mt-2 text-xs text-suave">Suma todo lo del canal (IA, investigación y tareas externas). Lo que pase el tope mensual no se ejecuta ni se registra.</p>
       </div>
 
       {conGasto.length > 0 && (

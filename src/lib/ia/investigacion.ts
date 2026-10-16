@@ -58,7 +58,7 @@ export type Investigador = (p: PedidoInvestigacion) => Promise<ResultadoInvestig
 export function investigadorClaude(cliente?: Anthropic): Investigador {
   return async (pedido) => {
     if (!cliente && !process.env.ANTHROPIC_API_KEY) throw new ErrorGenerador("Falta la variable de entorno ANTHROPIC_API_KEY en el servidor.");
-    const client = cliente ?? new Anthropic();
+    const client = cliente ?? new Anthropic({ maxRetries: 3 });
     const { system, usuario } = promptInvestigacion(pedido);
     const mensajes: Anthropic.Beta.Messages.BetaMessageParam[] = [{ role: "user", content: usuario }];
     const uso: Uso = { input_tokens: 0, output_tokens: 0 };

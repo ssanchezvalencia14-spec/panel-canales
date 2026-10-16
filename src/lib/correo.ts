@@ -2,6 +2,19 @@
 
 import { createTransport } from "nodemailer";
 import { nombrePanel } from "./panel";
+import { conReintentos } from "./reintentos";
+
+/** Fallos de SMTP que vale la pena repetir: conexión caída o rechazo temporal (4xx). Nunca 535 (credenciales). */
+export function smtpPasajero(e: unknown): boolean {
+  const x = e as { code?: string; responseCode?: number };
+  if (typeof x?.responseCode === "number") return x.responseCode >= 400 && x.responseCode < 500;
+  return ["ECONNECTION", "ETIMEDOUT", "ESOCKET", "EDNS", "ECONNRESET"].includes(x?.code ?? "");
+}
+
+type Mensaje = Parameters<ReturnType<typeof createTransport>["sendMail"]>[0];
+function enviarConReintento(smtp: NonNullable<ReturnType<typeof configSmtp>>, mensaje: Mensaje) {
+  return conReintentos(() => createTransport(smtp).sendMail(mensaje), { intentos: 2, baseMs: 2000, etiqueta: "smtp", reintentable: smtpPasajero });
+}
 
 export function escaparHtml(texto: string): string {
   return texto
@@ -60,8 +73,7 @@ export async function enviarEnlaceDeAcceso(params: { para: string; url: string; 
     return;
   }
 
-  const transporte = createTransport(smtp);
-  const info = await transporte.sendMail({
+  const info = await enviarConReintento(smtp, {
     to: params.para,
     from: remitente(),
     subject: asunto,
@@ -83,7 +95,7 @@ export async function enviarCorreo(params: { para: string[]; asunto: string; tex
     console.info(`\n[correo de desarrollo] Para: ${params.para.join(", ")}\nAsunto: ${params.asunto}\n${params.texto}\n`);
     return { enviados: params.para.length };
   }
-  const info = await createTransport(smtp).sendMail({
+  const info = await enviarConReintento(smtp, {
     from: remitente(),
     // Cada persona ve solo su dirección.
     to: remitente(),

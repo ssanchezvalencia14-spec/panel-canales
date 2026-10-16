@@ -8,7 +8,7 @@ Plan completo por fases: [`docs/PLAN_PANEL_CANALES.pdf`](docs/PLAN_PANEL_CANALES
 
 ## Estado
 
-**Fases 0 a 5** hechas. Desplegado en el dominio provisional de Hostinger.
+**Fases 0 a 6** hechas. Desplegado en el dominio provisional de Hostinger.
 
 | Entregable | Estado |
 |---|---|
@@ -52,7 +52,16 @@ Plan completo por fases: [`docs/PLAN_PANEL_CANALES.pdf`](docs/PLAN_PANEL_CANALES
 | Resumen semanal automático en borrador, que un admin aprueba y envía al equipo | ✅ |
 | Investigación semanal de referencias (búsqueda web con Claude e insumo de vidIQ) guardada como informe | ✅ (requiere `ANTHROPIC_API_KEY`) |
 
-Pendiente para fases siguientes: arrastrar y soltar en el tablero (Fase 6: endurecimiento).
+| **Fase 6 · Endurecimiento** | |
+| Auditoría de permisos: prueba que falla si una acción, ruta API o función de datos queda sin control; página **Auditoría** para el superadmin | ✅ |
+| Logs JSON estructurados sin secretos; errores inesperados con referencia para el usuario; páginas de error en español | ✅ |
+| Copias de seguridad: cron diario con rotación, descarga desde Auditoría y restauración solo sobre base vacía | ✅ (requiere la tarea cron) |
+| Control de costos: tope mensual por canal (además de por video y por informe) y gasto del mes por tipo | ✅ |
+| Reintentos: Google (lecturas y token), Claude (SDK) y SMTP; cada canal del cron aislado | ✅ |
+| Cabeceras de seguridad, límite de enlaces de acceso, limpieza diaria de sesiones vencidas, nodemailer 10 (0 vulnerabilidades) | ✅ |
+| Documentación: [operación](docs/OPERACION.md) y [guía del equipo](docs/GUIA_EQUIPO.md), también en **Ayuda** dentro del panel | ✅ |
+
+Fuera del plan por fases y sin hacer: arrastrar y soltar en el tablero y actualización en tiempo real.
 
 ## Datos y estadísticas (Fase 2)
 
@@ -125,6 +134,8 @@ En la sección **Informes** de cada canal, y en la vista Red con el número de a
 curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<dominio>/api/cron/diario
 # los lunes a las 07:00
 curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<dominio>/api/cron/semanal
+# todos los días a las 03:00: copia de seguridad
+curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<dominio>/api/cron/respaldo
 # opcional, cada día: métricas y calendario de Google
 curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<dominio>/api/cron/sincronizar
 ```
@@ -149,6 +160,16 @@ Cada sincronización:
 - lee las reuniones del calendario (30 días atrás y 120 adelante).
 
 Cada corrida queda en la tabla `ejecuciones` con su log, y el último error se muestra en la página de integraciones.
+
+## Endurecimiento (Fase 6)
+
+Resumen; el detalle operativo está en [`docs/OPERACION.md`](docs/OPERACION.md).
+
+- **Permisos:** `tests/unit/auditoria-permisos.test.ts` revisa el código. Cada server action pide la sesión, cada ruta API exige sesión o `CRON_SECRET`, cada función de datos que recibe un usuario comprueba su rol y la matriz de roles es la documentada. **Auditoría** (superadmin) muestra usuarios y roles por canal, sesiones abiertas, integraciones, fallos de 30 días, gasto del mes, respaldos y qué variables faltan, nunca sus valores.
+- **Logs y errores:** una línea JSON por evento (`src/lib/log.ts`), que oculta claves y tokens. Un error inesperado en un formulario muestra «referencia ABC123», que se busca en los registros como `"ref":"ABC123"`.
+- **Respaldos:** `/api/cron/respaldo` (diario) o `npm run respaldo` guardan un `.json.gz` en `RESPALDOS_DIR` (por defecto `~/respaldos-panel`) y conservan `RESPALDOS_MAX`. `npm run restaurar -- archivo` solo actúa sobre una base migrada y vacía. Se prueba en integración que la copia restaurada es idéntica.
+- **Costos:** `reglas.limiteGastoMensual` por canal, editable en **Ejecuciones**, se comprueba antes de cualquier gasto (IA, investigación, registros manuales).
+- **Reintentos:** espera exponencial ante red caída, 429 o 5xx en lecturas de Google y en el refresh del token; las creaciones no se repiten. El SDK de Claude repite hasta 3 veces; SMTP, un reintento salvo error de credenciales.
 
 ## Stack
 
@@ -243,7 +264,9 @@ Sin `SMTP_HOST`, el enlace de acceso **se imprime en la consola del servidor** (
 | `npm run db:seed` | Superadmins (`datos/red.json`), canales de `datos/canales`, su equipo y su agenda |
 | `npm run build:hostinger` | Migraciones + seed + build (lo usa Hostinger en cada despliegue) |
 | `npm run db:local` | MySQL efímero con migraciones y seed |
-| `npm run usuario:crear -- --email x@y.com [--nombre "…"] [--canal slug --rol productor] [--superadmin]` | Alta de usuario y rol |
+| `npm run usuario:crear -- --email x@y.com [--nombre "…"] [--canal slug --rol productor] [--superadmin] [--inactivo|--activo]` | Alta de usuario y rol; `--inactivo` bloquea el acceso y cierra sus sesiones |
+| `npm run respaldo [-- archivo]` | Copia de seguridad a `.json.gz` (con rotación si no se da archivo) |
+| `npm run restaurar -- archivo` | Restaura un respaldo en una base migrada y vacía |
 | `npm run agenda:importar -- --canal slug --archivo AGENDA.md [--anio 2026] [--simular]` | Importa una agenda; `--simular` solo muestra lo que leería |
 
 ## Añadir un canal
@@ -279,7 +302,9 @@ Detalle en [`.env.example`](.env.example).
 | `INTEGRACIONES_CLAVE` | para Google | 32 bytes en base64; cifra los permisos de Google guardados |
 | `ANTHROPIC_API_KEY` | para la IA | Clave de la API de Claude (borradores de guion) |
 | `ANTHROPIC_MODEL` | opcional | Modelo del borrador (por defecto `claude-opus-5-5`) |
-| `CRON_SECRET` | para el cron | Secreto de `/api/cron/sincronizar` (mín. 16 caracteres) |
+| `CRON_SECRET` | para el cron | Secreto de `/api/cron/*` (mín. 16 caracteres) |
+| `RESPALDOS_DIR` | opcional | Carpeta de respaldos en el servidor (por defecto `~/respaldos-panel`) |
+| `RESPALDOS_MAX` | opcional | Respaldos a conservar (14) |
 | `PANEL_NOMBRE`, `PANEL_COLOR_ACENTO` | opcional | Identidad neutra del panel |
 | `DB_LOCAL_PUERTO` | opcional | Puerto de `db:local` (3307) |
 

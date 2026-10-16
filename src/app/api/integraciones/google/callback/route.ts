@@ -4,6 +4,7 @@ import { cifrar } from "@/lib/cifrado";
 import { puede } from "@/lib/dominio/roles";
 import { ALCANCES_GOOGLE, configOAuthDesdeEntorno, Google, intercambiarCodigo } from "@/lib/google/cliente";
 import { verificarEstado } from "@/lib/google/estado";
+import { log } from "@/lib/log";
 import { prisma } from "@/lib/prisma-global";
 import { cargarUsuario } from "@/server/acceso";
 
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
     });
     return volver("ok=conectado");
   } catch (e) {
-    console.error("[integraciones] fallo al conectar Google:", e instanceof Error ? e.message : e);
+    log.error("google_conectar_fallido", { error: e });
     return volver("error=google");
   }
 }

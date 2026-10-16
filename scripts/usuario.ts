@@ -2,6 +2,8 @@
 //
 //   npm run usuario:crear -- --email ana@ejemplo.com --nombre "Ana" --canal mi-canal --rol productor
 //   npm run usuario:crear -- --email yo@ejemplo.com --superadmin
+//   npm run usuario:crear -- --email ex@ejemplo.com --inactivo   (bloquea el acceso y cierra sus sesiones)
+//   npm run usuario:crear -- --email ex@ejemplo.com --activo
 
 import "dotenv/config";
 import { parseArgs } from "node:util";
@@ -16,6 +18,8 @@ const { values } = parseArgs({
     canal: { type: "string" },
     rol: { type: "string" },
     superadmin: { type: "boolean", default: false },
+    inactivo: { type: "boolean", default: false },
+    activo: { type: "boolean", default: false },
   },
 });
 
@@ -30,6 +34,15 @@ async function main() {
       canal: values.canal,
       rol: values.rol as Rol | undefined,
     });
+    if (values.inactivo && values.activo) throw new Error("Usa --activo o --inactivo, no los dos.");
+    if (values.inactivo) {
+      await db.user.update({ where: { id: u.id }, data: { activo: false } });
+      const { count } = await db.session.deleteMany({ where: { userId: u.id } });
+      console.log(`Acceso bloqueado para ${u.email}; ${count} sesión(es) cerrada(s).`);
+    } else if (values.activo) {
+      await db.user.update({ where: { id: u.id }, data: { activo: true } });
+      console.log(`Acceso reactivado para ${u.email}.`);
+    }
     const rol = values.canal ? ` · ${values.rol} en ${values.canal}` : "";
     console.log(`Usuario ${u.email}${u.esSuperadmin ? " (superadmin)" : ""}${rol}.`);
   } finally {

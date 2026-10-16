@@ -7,6 +7,7 @@ import type { Db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import { puede, type Accion } from "@/lib/dominio/roles";
 import { leerPilares } from "@/lib/dominio/canal-config";
+import { fechaLocal, fechaLocalAUtc } from "@/lib/dominio/fechas";
 import { puntuarGancho } from "@/lib/puntaje/gancho";
 import { limitesDeCanal, revisarTitulo } from "@/lib/puntaje/titulo";
 import { costoDe, costoMaximo, construirPrompt, ErrorGenerador, MODELO_GUION, type Generador, type PedidoGuion } from "@/lib/ia/guion";
@@ -169,8 +170,39 @@ export async function gastoDeVideo(db: Db, canalId: string, videoId: string) {
   return { gastado: Math.round((num(suma._sum.costo) ?? 0) * 10_000) / 10_000, tope };
 }
 
+/** Tope mensual del canal (reglas.limiteGastoMensual, USD). Sin regla = sin tope. */
+export function topeMensual(reglas: unknown): number | null {
+  const v = (reglas as { limiteGastoMensual?: unknown } | null)?.limiteGastoMensual;
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null;
+}
+
+/** Gasto del mes calendario en curso (zona horaria del canal), total y por tipo de ejecución. */
+export async function gastoDelMes(db: Db, canalId: string, ahora = new Date()) {
+  const canal = await db.canal.findUniqueOrThrow({ where: { id: canalId }, select: { zonaHoraria: true, reglas: true } });
+  const mes = fechaLocal(ahora, canal.zonaHoraria).slice(0, 7);
+  const desde = fechaLocalAUtc(`${mes}-01`, "00:00", canal.zonaHoraria);
+  const grupos = await db.ejecucion.groupBy({ by: ["tipo"], where: { canalId, creadoEn: { gte: desde } }, _sum: { costo: true }, _count: true });
+  const porTipo = grupos
+    .map((g) => ({ tipo: g.tipo, total: num(g._sum.costo) ?? 0, cantidad: g._count }))
+    .sort((a, b) => b.total - a.total);
+  const gastado = Math.round(porTipo.reduce((a, g) => a + g.total, 0) * 10_000) / 10_000;
+  return { mes, desde, gastado, tope: topeMensual(canal.reglas), porTipo };
+}
+
+/** Bloquea cualquier gasto que haría pasar el tope mensual del canal. */
+export async function exigirTopeMensual(db: Db, canalId: string, adicional: number, ahora = new Date()) {
+  if (adicional <= 0) return;
+  const { gastado, tope, mes } = await gastoDelMes(db, canalId, ahora);
+  if (tope !== null && gastado + adicional > tope + 1e-9) {
+    throw new TopeExcedido(
+      `Supera el tope mensual del canal (${mes}): lleva US$ ${gastado.toFixed(2)} de US$ ${tope.toFixed(2)} y esto suma US$ ${adicional.toFixed(2)}. Un admin puede subir «limiteGastoMensual».`,
+    );
+  }
+}
+
 async function exigirTope(db: Db, canalId: string, videoId: string, adicional: number) {
   if (adicional <= 0) return;
+  await exigirTopeMensual(db, canalId, adicional);
   const { gastado, tope } = await gastoDeVideo(db, canalId, videoId);
   if (tope !== null && gastado + adicional > tope + 1e-9) {
     throw new TopeExcedido(
@@ -192,6 +224,21 @@ export async function cambiarTopeCanal(db: Db, u: UsuarioSesion, canalId: string
   return db.canal.update({ where: { id: canalId }, data: { limiteGastoVideo: tope } });
 }
 
+export async function cambiarTopeMensual(db: Db, u: UsuarioSesion, canalId: string, tope: number | null) {
+  exigir(u, canalId, "configurar_canal", "Solo un admin del canal puede cambiar el tope mensual.");
+  if (tope !== null && (!Number.isFinite(tope) || tope < 0)) throw new DatoInvalido("El tope debe ser un número positivo.");
+  const canal = await db.canal.findUniqueOrThrow({ where: { id: canalId }, select: { reglas: true } });
+  const reglas = { ...((canal.reglas ?? {}) as Record<string, unknown>) };
+  if (tope === null) delete reglas.limiteGastoMensual;
+  else reglas.limiteGastoMensual = tope;
+  return db.canal.update({ where: { id: canalId }, data: { reglas: aJson(reglas) } });
+}
+
+export async function gastoMensualCanal(db: Db, u: UsuarioSesion, canalId: string, ahora = new Date()) {
+  exigir(u, canalId, "ver");
+  return gastoDelMes(db, canalId, ahora);
+}
+
 // ─────────────────────────── Ejecuciones externas ───────────────────────────
 
 export const TIPOS_EJECUCION = ["voz", "imagenes", "subtitulos", "render", "guion_ia", "salida_lista", "otro"] as const;
@@ -205,6 +252,7 @@ export const NOMBRE_TIPO_EJECUCION: Record<string, string> = {
   salida_lista: "Salida lista",
   sincronizacion_google: "Sincronización con Google",
   verificacion: "Verificación",
+  investigacion: "Investigación de referencias",
   otro: "Otro",
 };
 
@@ -228,6 +276,8 @@ export async function registrarEjecucion(db: Db, u: UsuarioSesion, canalId: stri
   if (d.videoId) {
     await videoDelCanal(db, canalId, d.videoId);
     await exigirTope(db, canalId, d.videoId, d.costo ?? 0);
+  } else {
+    await exigirTopeMensual(db, canalId, d.costo ?? 0);
   }
   return db.ejecucion.create({
     data: {
@@ -254,7 +304,11 @@ export async function actualizarEjecucion(
   const e = await db.ejecucion.findFirst({ where: { id, canalId } });
   if (!e) throw new NoEncontrado("Ejecución no encontrada.");
   validarEjecucion({ ...d, videoId: e.videoId, tipo: "otro", log: null });
-  if (e.videoId && d.costo !== null) await exigirTope(db, canalId, e.videoId, d.costo - (num(e.costo) ?? 0));
+  if (d.costo !== null) {
+    const extra = d.costo - (num(e.costo) ?? 0);
+    if (e.videoId) await exigirTope(db, canalId, e.videoId, extra);
+    else await exigirTopeMensual(db, canalId, extra);
+  }
   const sello = `[${new Date().toISOString().slice(0, 16).replace("T", " ")} ${u.email}] ${d.estado}${d.nota ? `: ${d.nota}` : ""}`;
   return db.ejecucion.update({
     where: { id: e.id },

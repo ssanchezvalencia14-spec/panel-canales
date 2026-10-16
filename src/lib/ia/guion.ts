@@ -107,7 +107,7 @@ export function generadorClaude(cliente?: Anthropic): Generador {
     if (!cliente && !process.env.ANTHROPIC_API_KEY) {
       throw new ErrorGenerador("Falta la variable de entorno ANTHROPIC_API_KEY en el servidor.");
     }
-    const client = cliente ?? new Anthropic();
+    const client = cliente ?? new Anthropic({ maxRetries: 3 });
     const { system, usuario } = construirPrompt(pedido);
     const stream = client.beta.messages.stream({
       model: MODELO_GUION,

@@ -9,6 +9,10 @@ import type { Adapter } from "next-auth/adapters";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma-global";
 import { configSmtp, enviarEnlaceDeAcceso } from "@/lib/correo";
+import { log } from "@/lib/log";
+
+/** Enlaces vigentes por correo: más que esto en 15 min y no se envía otro (frena abusos y spam). */
+export const MAX_ENLACES_VIGENTES = 3;
 
 const base = PrismaAdapter(prisma);
 
@@ -49,7 +53,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: "/login/error",
   },
   callbacks: {
-    async signIn({ user }) {
+    async signIn({ user, email: datosCorreo }) {
       const email = user.email?.toLowerCase().trim();
       if (!email) return false;
       const existente = await prisma.user.findUnique({
@@ -57,7 +61,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         select: { activo: true },
       });
       // Sin cuenta o desactivado: no se envía enlace ni se crea usuario.
-      return Boolean(existente?.activo);
+      if (!existente?.activo) return false;
+      if (datosCorreo?.verificationRequest) {
+        const vigentes = await prisma.verificationToken.count({ where: { identifier: email, expires: { gt: new Date() } } });
+        if (vigentes >= MAX_ENLACES_VIGENTES) {
+          log.aviso("login_limite_enlaces", { vigentes });
+          return false;
+        }
+      }
+      return true;
     },
     session({ session, user }) {
       session.user.id = user.id;

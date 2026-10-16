@@ -10,6 +10,7 @@ import { fechaLocal } from "@/lib/dominio/fechas";
 import { configOAuthDesdeEntorno, Google, tokenDeAcceso, type ConfigOAuth, type EventoGoogle, type Fetch } from "@/lib/google/cliente";
 import { emparejar } from "@/lib/metricas/emparejar";
 import { guardarFotoInterna } from "./metricas";
+import { log } from "@/lib/log";
 
 export type ResumenSincronizacion = {
   ok: boolean;
@@ -199,8 +200,14 @@ export async function sincronizarTodos(db: Db, deps: Dependencias = {}) {
   const integraciones = await db.integracion.findMany({ where: { proveedor: "google" }, select: { canalId: true, canal: { select: { slug: true } } } });
   const salida: { canal: string; ok: boolean; log: string[] }[] = [];
   for (const i of integraciones) {
-    const r = await sincronizarCanal(db, i.canalId, deps);
-    salida.push({ canal: i.canal.slug, ok: r.ok, log: r.log });
+    try {
+      const r = await sincronizarCanal(db, i.canalId, deps);
+      salida.push({ canal: i.canal.slug, ok: r.ok, log: r.log });
+      if (!r.ok) log.aviso("sincronizacion_con_errores", { canal: i.canal.slug, detalle: r.log.join(" | ") });
+    } catch (e) {
+      log.error("sincronizacion_fallida", { canal: i.canal.slug, error: e });
+      salida.push({ canal: i.canal.slug, ok: false, log: [`Error: ${e instanceof Error ? e.message : e}`] });
+    }
   }
   return salida;
 }

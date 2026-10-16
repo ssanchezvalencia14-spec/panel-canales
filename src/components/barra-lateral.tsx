@@ -57,8 +57,14 @@ export function BarraLateral({ esSuperadmin, canales }: { esSuperadmin: boolean;
           <Enlace href="/canales/nuevo" activo={segmentos[0] === "canales"}>
             + Nuevo canal
           </Enlace>
+          <Enlace href="/auditoria" activo={segmentos[0] === "auditoria"}>
+            Auditoría
+          </Enlace>
         </>
       )}
+      <Enlace href="/ayuda" activo={segmentos[0] === "ayuda"}>
+        Ayuda
+      </Enlace>
     </nav>
   );
 }

@@ -10,6 +10,7 @@ import {
   actualizarEjecucion,
   agregarCifra,
   cambiarTopeCanal,
+  cambiarTopeMensual,
   cambiarTopeVideo,
   declararSinCifras,
   editarPitch,
@@ -215,6 +216,18 @@ export async function topeCanalAccion(slug: string, _p: Resultado, f: FormData):
     await cambiarTopeCanal(prisma, usuario, canal.id, tope);
     refrescar(slug);
     return { ok: tope === null ? "Sin tope de gasto por video." : `Tope por video: US$ ${tope.toFixed(2)}.` };
+  } catch (e) {
+    return aResultado(e);
+  }
+}
+
+export async function topeMensualAccion(slug: string, _p: Resultado, f: FormData): Promise<Resultado> {
+  try {
+    const { usuario, canal } = await canalDe(slug);
+    const tope = numeroOpcional(f, "tope");
+    await cambiarTopeMensual(prisma, usuario, canal.id, tope);
+    refrescar(slug);
+    return { ok: tope === null ? "Sin tope mensual." : `Tope mensual: US$ ${tope.toFixed(2)}.` };
   } catch (e) {
     return aResultado(e);
   }
