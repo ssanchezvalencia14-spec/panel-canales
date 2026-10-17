@@ -17,6 +17,7 @@ import {
   forzarGancho,
   generarBorradorGuion,
   guardarGuionManual,
+  importarGuionDeChat,
   marcarSalidaLista,
   reabrirCifra,
   recalcularPuntaje,
@@ -99,6 +100,17 @@ export async function generarGuionAccion(slug: string, videoId: string, prev: Re
     const r = await generarBorradorGuion(prisma, usuario, canal.id, videoId, generadorClaude());
     refrescar(slug);
     return { ok: `Borrador v${r.guion.version} listo: ${r.cifras} cifra(s) a verificar, costo US$ ${r.costo.toFixed(4)}.` };
+  } catch (e) {
+    return aResultado(e);
+  }
+}
+
+export async function guionDeChatAccion(slug: string, videoId: string, _p: Resultado, f: FormData): Promise<Resultado> {
+  try {
+    const { usuario, canal } = await canalDe(slug);
+    const r = await importarGuionDeChat(prisma, usuario, canal.id, videoId, String(f.get("respuesta") ?? ""));
+    refrescar(slug);
+    return { ok: `Borrador v${r.guion.version} guardado desde el chat: ${r.cifras} cifra(s) a verificar.` };
   } catch (e) {
     return aResultado(e);
   }

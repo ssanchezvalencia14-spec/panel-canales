@@ -45,7 +45,13 @@ Todo cambio queda en el **registro de actividad**, con quién y cuándo.
 
 ## Producción
 
-- **Borrador de guion con IA:** en la ficha del video, botón **Generar borrador**. Sigue las reglas de voz del canal. Es un punto de partida: se revisa y se edita.
+- **Borrador de guion con tu chat de IA** (sin API):
+  1. En la ficha del video, abre **Borrador con tu chat de IA** y pulsa **Copiar**.
+  2. Abre un chat nuevo en claude.ai (o la IA que uses), pega y espera la respuesta completa.
+  3. Copia toda la respuesta, de `===GUION===` a `===FIN===`, pégala en el panel y pulsa **Guardar borrador del chat**. El guion queda como una versión nueva y sus cifras pasan al checklist.
+  4. Si el panel dice que no encuentra las marcas, pídele al chat: «responde respetando exactamente el formato de marcas».
+- **Borrador con la API:** si el admin configuró la clave de la API, aparece además el botón **Generar borrador con IA**.
+- En los dos casos el borrador es un punto de partida: se revisa y se edita.
 - **Ejecuciones:** todo lo que se hace fuera del panel (voz, imágenes, subtítulos, render en la PC) se registra con su costo y el enlace de salida en Drive. El panel no guarda archivos de video, solo enlaces.
 - **Topes de gasto:** hay un tope por video y otro por mes para todo el canal. Si un registro o una llamada a la IA pasaría el tope, el panel no lo hace y lo avisa. Un admin puede subir el tope en **Ejecuciones**.
 - **Marcar salida lista:** cuando el largo, los TikTok y los Shorts están en Drive, pega los enlaces y márcalo.
@@ -61,7 +67,7 @@ Todo cambio queda en el **registro de actividad**, con quién y cuándo.
 
 - **Alertas:** el panel avisa de videos atrasados, de falta de videos listos (colchón) y de cifras sin verificar. Las ves en **Informes** y en la vista **Red**.
 - **Resumen semanal:** llega en borrador. Un admin lo revisa, lo edita si hace falta y lo envía al equipo.
-- **Investigación de referencias:** un informe semanal con tendencias y enlaces. Es insumo para ideas, no datos verificados.
+- **Investigación de referencias:** un informe semanal con tendencias y enlaces. Un admin lo hace desde **Informes → Investigar con tu chat de IA**: copia las instrucciones, las pega en claude.ai con la búsqueda web activada y pega el informe en el panel. Es insumo para ideas, no datos verificados.
 
 ## Si algo falla
 

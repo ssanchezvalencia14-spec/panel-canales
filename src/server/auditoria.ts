@@ -17,7 +17,7 @@ export const VARIABLES_REVISADAS = [
   ["CRON_SECRET", "Tareas programadas"],
   ["INTEGRACIONES_CLAVE", "Cifrado de tokens de Google"],
   ["GOOGLE_CLIENT_ID", "Conexión con Google"],
-  ["ANTHROPIC_API_KEY", "IA (guiones e investigación)"],
+  ["ANTHROPIC_API_KEY", "IA por API (opcional: sin ella se usa el modo chat)"],
   ["RESPALDOS_DIR", "Carpeta de respaldos (opcional)"],
 ] as const;
 

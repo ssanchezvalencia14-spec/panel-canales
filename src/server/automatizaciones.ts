@@ -19,6 +19,7 @@ import { enviarCorreo } from "@/lib/correo";
 import { nombrePanel } from "@/lib/panel";
 import { costoMaximoInvestigacion, promptInvestigacion, type Investigador } from "@/lib/ia/investigacion";
 import { ErrorGenerador, MODELO_GUION } from "@/lib/ia/guion";
+import { leerRespuestaInvestigacion, MODELO_CHAT, promptParaChat } from "@/lib/ia/chat";
 import { combinarMetricas } from "@/lib/metricas/resultados";
 import { AccesoDenegado, NoEncontrado, type UsuarioSesion } from "./acceso";
 import { avisarEquipo, registrarActividad } from "./actividad";
@@ -217,13 +218,7 @@ export function topeInvestigacion(reglas: unknown): number {
   return typeof v === "number" && v >= 0 ? v : 3;
 }
 
-export async function generarInvestigacion(
-  db: Db,
-  canalId: string,
-  investigar: Investigador,
-  opciones: { ahora?: Date; datosVidiq?: string | null; generadoPorId?: string | null } = {},
-) {
-  const ahora = opciones.ahora ?? new Date();
+async function pedidoInvestigacion(db: Db, canalId: string, ahora: Date, datosVidiq: string | null | undefined) {
   const canal = await db.canal.findUniqueOrThrow({ where: { id: canalId } });
   const semana = semanaISO(fechaLocal(ahora, canal.zonaHoraria));
   const recientes = await db.video.findMany({ where: { canalId }, orderBy: { fechaPublicacion: "desc" }, take: 12, select: { titulo: true } });
@@ -231,11 +226,23 @@ export async function generarInvestigacion(
   const pedido = {
     canal: { nombre: canal.nombre, idioma: canal.idioma, pilares: leerPilares(canal.pilares), voz: Array.isArray(reglas.voz) ? (reglas.voz as string[]) : [] },
     titulosRecientes: recientes.map((r) => r.titulo),
-    datosVidiq: opciones.datosVidiq?.trim() || null,
+    datosVidiq: datosVidiq?.trim() || null,
     semana,
   };
+  return { canal, semana, pedido };
+}
+
+export async function generarInvestigacion(
+  db: Db,
+  canalId: string,
+  investigar: Investigador,
+  opciones: { ahora?: Date; datosVidiq?: string | null; generadoPorId?: string | null; externo?: boolean } = {},
+) {
+  const ahora = opciones.ahora ?? new Date();
+  const { canal, semana, pedido } = await pedidoInvestigacion(db, canalId, ahora, opciones.datosVidiq);
   const { system, usuario } = promptInvestigacion(pedido);
-  const maximo = costoMaximoInvestigacion(system.length + usuario.length);
+  // Lo hecho en un chat externo no gasta nada en el panel.
+  const maximo = opciones.externo ? 0 : costoMaximoInvestigacion(system.length + usuario.length);
   const tope = topeInvestigacion(canal.reglas);
   if (maximo > tope) {
     throw new TopeExcedido(`El peor caso de la investigación (US$ ${maximo.toFixed(2)}) supera el tope del canal (US$ ${tope.toFixed(2)}). Un admin puede subir «limiteGastoInvestigacion».`);
@@ -243,7 +250,7 @@ export async function generarInvestigacion(
   await exigirTopeMensual(db, canalId, maximo, ahora);
 
   const ej = await db.ejecucion.create({
-    data: { canalId, tipo: "investigacion", estado: "en_curso", registradoPorId: opciones.generadoPorId ?? null, log: `Semana ${semana}. Modelo pedido: ${MODELO_GUION}` },
+    data: { canalId, tipo: "investigacion", estado: "en_curso", registradoPorId: opciones.generadoPorId ?? null, log: `Semana ${semana}. ${opciones.externo ? "Pegada desde un chat externo" : `Modelo pedido: ${MODELO_GUION}`}` },
   });
   try {
     const r = await investigar(pedido);
@@ -266,7 +273,9 @@ export async function generarInvestigacion(
       data: {
         estado: "ok",
         costo: r.costo,
-        log: [`Modelo: ${r.modelo}`, `Tokens: ${r.uso.input_tokens} de entrada, ${r.uso.output_tokens} de salida`, `Búsquedas web: ${r.busquedas}`, `Costo: US$ ${r.costo.toFixed(4)}${r.estimado ? " (estimado)" : ""}`, pedido.datosVidiq ? "Con datos de vidIQ del equipo" : "Sin datos de vidIQ"].join("\n"),
+        log: (opciones.externo
+          ? ["Investigación hecha en un chat externo (sin API) y pegada en el panel", "Costo en el panel: US$ 0"]
+          : [`Modelo: ${r.modelo}`, `Tokens: ${r.uso.input_tokens} de entrada, ${r.uso.output_tokens} de salida`, `Búsquedas web: ${r.busquedas}`, `Costo: US$ ${r.costo.toFixed(4)}${r.estimado ? " (estimado)" : ""}`, pedido.datosVidiq ? "Con datos de vidIQ del equipo" : "Sin datos de vidIQ"]).join("\n"),
       },
     });
     return informe;
@@ -280,6 +289,26 @@ export async function generarInvestigacion(
 export async function investigarAhora(db: Db, u: UsuarioSesion, canalId: string, investigar: Investigador, datosVidiq: string | null) {
   exigir(u, canalId, "configurar_canal", "Solo un admin del canal lanza la investigación.");
   return generarInvestigacion(db, canalId, investigar, { datosVidiq, generadoPorId: u.id });
+}
+
+/** Modo chat: instrucciones listas para pegar en el chat de IA del equipo (con búsqueda web). */
+export async function promptInvestigacionDeChat(db: Db, u: UsuarioSesion, canalId: string, ahora = new Date()) {
+  exigir(u, canalId, "configurar_canal", "Solo un admin del canal lanza la investigación.");
+  const { pedido } = await pedidoInvestigacion(db, canalId, ahora, null);
+  return promptParaChat(promptInvestigacion(pedido), "investigacion");
+}
+
+/** Modo chat: guarda el informe pegado como la investigación de la semana, sin costo. */
+export async function importarInvestigacionDeChat(db: Db, u: UsuarioSesion, canalId: string, texto: string, ahora = new Date()) {
+  exigir(u, canalId, "configurar_canal", "Solo un admin del canal lanza la investigación.");
+  let informe: string;
+  try {
+    informe = leerRespuestaInvestigacion(texto);
+  } catch (e) {
+    throw new DatoInvalido(e instanceof Error ? e.message : String(e));
+  }
+  const pegado: Investigador = async () => ({ informe, modelo: MODELO_CHAT, uso: { input_tokens: 0, output_tokens: 0 }, busquedas: 0, costo: 0, estimado: false });
+  return generarInvestigacion(db, canalId, pegado, { ahora, generadoPorId: u.id, externo: true });
 }
 
 export async function resumenAhora(db: Db, u: UsuarioSesion, canalId: string) {

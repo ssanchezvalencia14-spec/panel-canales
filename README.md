@@ -59,6 +59,7 @@ Plan completo por fases: [`docs/PLAN_PANEL_CANALES.pdf`](docs/PLAN_PANEL_CANALES
 | Control de costos: tope mensual por canal (además de por video y por informe) y gasto del mes por tipo | ✅ |
 | Reintentos: Google (lecturas y token), Claude (SDK) y SMTP; cada canal del cron aislado | ✅ |
 | Cabeceras de seguridad, límite de enlaces de acceso, limpieza diaria de sesiones vencidas, nodemailer 10 (0 vulnerabilidades) | ✅ |
+| **Modo chat, sin API de Anthropic:** guion e investigación hechos en claude.ai (u otra IA) y pegados en el panel, sin clave ni costo | ✅ |
 | Documentación: [operación](docs/OPERACION.md) y [guía del equipo](docs/GUIA_EQUIPO.md), también en **Ayuda** dentro del panel | ✅ |
 
 Fuera del plan por fases y sin hacer: arrastrar y soltar en el tablero y actualización en tiempo real.
@@ -170,6 +171,18 @@ Resumen; el detalle operativo está en [`docs/OPERACION.md`](docs/OPERACION.md).
 - **Respaldos:** `/api/cron/respaldo` (diario) o `npm run respaldo` guardan un `.json.gz` en `RESPALDOS_DIR` (por defecto `~/respaldos-panel`) y conservan `RESPALDOS_MAX`. `npm run restaurar -- archivo` solo actúa sobre una base migrada y vacía. Se prueba en integración que la copia restaurada es idéntica.
 - **Costos:** `reglas.limiteGastoMensual` por canal, editable en **Ejecuciones**, se comprueba antes de cualquier gasto (IA, investigación, registros manuales).
 - **Reintentos:** espera exponencial ante red caída, 429 o 5xx en lecturas de Google y en el refresh del token; las creaciones no se repiten. El SDK de Claude repite hasta 3 veces; SMTP, un reintento salvo error de credenciales.
+
+## IA sin API (modo chat)
+
+Sin `ANTHROPIC_API_KEY`, el panel no llama a ninguna API de IA y usa el **modo chat**:
+
+1. En la ficha del video, **Borrador con tu chat de IA → Copiar**. Las instrucciones llevan la voz, la estructura y las reglas de cifras del canal, más un formato de respuesta con marcas (`===GUION===`, `===CIFRAS===`, `===NOTAS===`, `===FIN===`).
+2. Se pegan en claude.ai (con la suscripción del equipo) o en otra IA.
+3. La respuesta se pega en el panel, que crea la versión del guion y el checklist de cifras igual que con la API. La ejecución queda registrada con costo 0 y quién la pegó. También acepta JSON con el esquema de la API.
+
+La **investigación semanal** funciona igual desde **Informes**: copiar las instrucciones, pedirle al chat que use la búsqueda web y pegar el informe. El panel exige que traiga enlaces.
+
+Con la clave definida, aparecen además los botones de la API y los dos modos conviven. Código: `src/lib/ia/chat.ts`.
 
 ## Stack
 
@@ -300,7 +313,7 @@ Detalle en [`.env.example`](.env.example).
 | `AGENDA_ANIO` | opcional | Año para fechas de agenda sin año |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | para Google | Credenciales OAuth (YouTube Analytics + Calendar) |
 | `INTEGRACIONES_CLAVE` | para Google | 32 bytes en base64; cifra los permisos de Google guardados |
-| `ANTHROPIC_API_KEY` | para la IA | Clave de la API de Claude (borradores de guion) |
+| `ANTHROPIC_API_KEY` | opcional | Clave de la API de Claude. Sin ella, guion e investigación se hacen en modo chat (sin costo en el panel) |
 | `ANTHROPIC_MODEL` | opcional | Modelo del borrador (por defecto `claude-opus-5-5`) |
 | `CRON_SECRET` | para el cron | Secreto de `/api/cron/*` (mín. 16 caracteres) |
 | `RESPALDOS_DIR` | opcional | Carpeta de respaldos en el servidor (por defecto `~/respaldos-panel`) |

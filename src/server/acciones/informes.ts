@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { investigadorClaude } from "@/lib/ia/investigacion";
 import { prisma } from "../db";
 import { NoEncontrado, obtenerCanalPorSlug } from "../acceso";
-import { aprobarYEnviarResumen, investigarAhora, resumenAhora, sincronizarAlertas } from "../automatizaciones";
+import { aprobarYEnviarResumen, importarInvestigacionDeChat, investigarAhora, resumenAhora, sincronizarAlertas } from "../automatizaciones";
 import { requireUsuario } from "../sesion";
 import { aResultado, type Resultado } from "./resultado";
 import { puede } from "@/lib/dominio/roles";
@@ -49,6 +49,17 @@ export async function investigarAccion(slug: string, _p: Resultado, f: FormData)
     const r = await investigarAhora(prisma, usuario, canal.id, investigadorClaude(), String(f.get("vidiq") ?? "") || null);
     refrescar(slug);
     return { ok: `${r.titulo} lista (US$ ${Number(r.costo ?? 0).toFixed(4)}).` };
+  } catch (e) {
+    return aResultado(e);
+  }
+}
+
+export async function investigacionDeChatAccion(slug: string, _p: Resultado, f: FormData): Promise<Resultado> {
+  try {
+    const { usuario, canal } = await canalDe(slug);
+    const r = await importarInvestigacionDeChat(prisma, usuario, canal.id, String(f.get("informe") ?? ""));
+    refrescar(slug);
+    return { ok: `${r.titulo} guardada desde el chat.` };
   } catch (e) {
     return aResultado(e);
   }

@@ -6,6 +6,8 @@ import { NOMBRE_ESTADO, ESTADOS_VIDEO, type EstadoVideo } from "@/lib/dominio/es
 import { NOMBRE_PROPIEDAD, type Propiedad, type PuntajeGancho } from "@/lib/puntaje/gancho";
 import type { RevisionTitulo } from "@/lib/puntaje/titulo";
 import { costoMaximo, construirPrompt, MODELO_GUION, type PedidoGuion } from "@/lib/ia/guion";
+import { MARCAS, promptParaChat } from "@/lib/ia/chat";
+import { Copiar } from "./confirmar-accion";
 import { NOMBRE_TIPO_EJECUCION, TIPOS_EJECUCION, type Piezas } from "@/server/produccion";
 import {
   actualizarEjecucionAccion,
@@ -14,6 +16,7 @@ import {
   forzarGanchoAccion,
   generarGuionAccion,
   guardarGuionAccion,
+  guionDeChatAccion,
   moverEstadoAccion,
   reabrirCifraAccion,
   recalcularAccion,
@@ -86,6 +89,9 @@ export function ProduccionVideo(d: Datos) {
   const anterior = i > 0 ? ESTADOS_VIDEO[i - 1] : null;
   const prompt = construirPrompt(d.pedido);
   const estimado = costoMaximo(prompt.system.length + prompt.usuario.length);
+  const promptChat = promptParaChat(prompt, "guion");
+  // Sin clave de API, el borrador se hace en el chat de IA del equipo.
+  const conApi = Boolean(process.env.ANTHROPIC_API_KEY);
   const pendientes = d.cifras.filter((c) => c.estado !== "hecha").length;
 
   return (
@@ -202,12 +208,48 @@ export function ProduccionVideo(d: Datos) {
       {/* Guion */}
       <Seccion titulo="Guion" extra={<span className="text-xs text-suave">{d.guiones.length ? `${d.guiones.length} versión(es)` : "sin borrador"}</span>}>
         {p.edita && (
-          <div className="mb-4 space-y-1">
-            <BotonAccion accion={generarGuionAccion.bind(null, slug, v.id)} texto="Generar borrador con IA" pendienteTexto="Generando (puede tardar un minuto)…" variante="primario" />
-            <p className="text-xs text-suave">
-              Modelo {MODELO_GUION}. Costo máximo estimado US$ {estimado.toFixed(2)}; queda registrado en ejecuciones. Usa las reglas de voz
-              y estructura del canal y nunca inventa cifras: las lista para verificar.
-            </p>
+          <div className="mb-4 space-y-3">
+            {conApi && (
+              <div className="space-y-1">
+                <BotonAccion accion={generarGuionAccion.bind(null, slug, v.id)} texto="Generar borrador con IA" pendienteTexto="Generando (puede tardar un minuto)…" variante="primario" />
+                <p className="text-xs text-suave">
+                  Modelo {MODELO_GUION}. Costo máximo estimado US$ {estimado.toFixed(2)}; queda registrado en ejecuciones. Usa las reglas de voz
+                  y estructura del canal y nunca inventa cifras: las lista para verificar.
+                </p>
+              </div>
+            )}
+            <details open={!conApi} className="rounded-md border border-borde bg-fondo p-3">
+              <summary className="cursor-pointer text-sm font-medium">Borrador con tu chat de IA (sin API, sin costo en el panel)</summary>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-suave">
+                <li>Copia las instrucciones: llevan la voz, la estructura y las reglas de cifras del canal.</li>
+                <li>
+                  Pégalas en un chat nuevo de{" "}
+                  <a href="https://claude.ai/new" target="_blank" rel="noopener noreferrer" className="text-acento underline">
+                    claude.ai
+                  </a>{" "}
+                  (o la IA que uses) y espera la respuesta completa.
+                </li>
+                <li>Copia toda la respuesta y pégala abajo. El panel crea la versión del guion y el checklist de cifras.</li>
+              </ol>
+              <div className="mt-2 flex items-center gap-2">
+                <Copiar texto={promptChat} />
+                <span className="text-xs text-suave">{promptChat.length.toLocaleString("es")} caracteres</span>
+              </div>
+              <details className="mt-1">
+                <summary className="cursor-pointer text-xs text-suave">Ver las instrucciones</summary>
+                <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded border border-borde p-2 font-mono text-[11px]">{promptChat}</pre>
+              </details>
+              <FormularioAccion accion={guionDeChatAccion.bind(null, slug, v.id)} boton="Guardar borrador del chat" pendiente="Leyendo…" className="mt-3 space-y-2">
+                <textarea
+                  name="respuesta"
+                  rows={8}
+                  required
+                  placeholder={`Pega aquí la respuesta completa (de ${MARCAS.guion} a ${MARCAS.fin})`}
+                  aria-label="Respuesta del chat"
+                  className={`${claseCampo} font-mono text-xs`}
+                />
+              </FormularioAccion>
+            </details>
           </div>
         )}
         {d.guiones.map((g, n) => (

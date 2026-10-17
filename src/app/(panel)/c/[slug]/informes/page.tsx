@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BotonAccion } from "@/components/estadisticas-formularios";
-import { ConfirmarAccion } from "@/components/confirmar-accion";
+import { ConfirmarAccion, Copiar } from "@/components/confirmar-accion";
 import { claseCampo, FormularioAccion } from "@/components/formulario-accion";
 import { puede } from "@/lib/dominio/roles";
 import { prisma } from "@/server/db";
 import { obtenerCanalPorSlug } from "@/server/acceso";
-import { enviarResumenAccion, investigarAccion, resumenAhoraAccion, revisarAlertasAccion } from "@/server/acciones/informes";
-import { alertasDeCanal, listarInformes, obtenerInforme, TIPO_RESUMEN, topeInvestigacion } from "@/server/automatizaciones";
+import { enviarResumenAccion, investigacionDeChatAccion, investigarAccion, resumenAhoraAccion, revisarAlertasAccion } from "@/server/acciones/informes";
+import { alertasDeCanal, listarInformes, obtenerInforme, promptInvestigacionDeChat, TIPO_RESUMEN, topeInvestigacion } from "@/server/automatizaciones";
 import { requireUsuario } from "@/server/sesion";
 
 const NOMBRE_ALERTA: Record<string, string> = {
@@ -26,6 +26,8 @@ export default async function Informes({ params }: PageProps<"/c/[slug]/informes
   if (!canal) notFound();
 
   const admin = puede(usuario, canal.id, "configurar_canal");
+  const conApi = Boolean(process.env.ANTHROPIC_API_KEY);
+  const promptChat = admin ? await promptInvestigacionDeChat(prisma, usuario, canal.id) : null;
   const [alertas, informes] = await Promise.all([
     alertasDeCanal(prisma, usuario, canal.id, 30),
     listarInformes(prisma, usuario, canal.id),
@@ -111,13 +113,33 @@ export default async function Informes({ params }: PageProps<"/c/[slug]/informes
       <div className="rounded-lg border border-borde bg-superficie p-4">
         <h2 className="mb-1 font-semibold">Investigación de referencias</h2>
         <p className="mb-3 text-xs text-suave">
-          Claude busca en la web referencias y tendencias del nicho y entrega un informe con enlaces (tope por informe: US${" "}
-          {topeInvestigacion(canal.reglas).toFixed(2)}). vidIQ no tiene API para el panel: pega aquí lo que exportes de vidIQ y se usa como insumo.
+          Un informe semanal con referencias y tendencias del nicho, siempre con enlaces. vidIQ no tiene API para el panel: lo que exportes de vidIQ
+          se usa como insumo.
         </p>
-        {admin && (
-          <FormularioAccion accion={investigarAccion.bind(null, canal.slug)} boton="Investigar ahora" pendiente="Investigando (puede tardar unos minutos)…" className="space-y-2">
+        {admin && conApi && (
+          <FormularioAccion accion={investigarAccion.bind(null, canal.slug)} boton="Investigar ahora con la API" pendiente="Investigando (puede tardar unos minutos)…" className="mb-3 space-y-2">
+            <p className="text-xs text-suave">Con la API de Claude y búsqueda web. Tope por informe: US$ {topeInvestigacion(canal.reglas).toFixed(2)}.</p>
             <textarea name="vidiq" rows={4} placeholder="Opcional: datos de vidIQ (outliers, palabras clave…)" aria-label="Datos de vidIQ" className={`${claseCampo} font-mono text-xs`} />
           </FormularioAccion>
+        )}
+        {admin && promptChat && (
+          <details open={!conApi} className="rounded-md border border-borde bg-fondo p-3">
+            <summary className="cursor-pointer text-sm font-medium">Investigar con tu chat de IA (sin API, sin costo en el panel)</summary>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-suave">
+              <li>Copia las instrucciones y pégalas en un chat nuevo de claude.ai con la búsqueda web activada (o la IA que uses).</li>
+              <li>Si tienes datos de vidIQ, pégalos en el mismo mensaje, debajo de las instrucciones.</li>
+              <li>Copia el informe completo y pégalo abajo. Se guarda como la investigación de esta semana.</li>
+            </ol>
+            <div className="mt-2 flex items-center gap-2">
+              <Copiar texto={promptChat} />
+              <a href="https://claude.ai/new" target="_blank" rel="noopener noreferrer" className="text-xs text-acento underline">
+                Abrir claude.ai
+              </a>
+            </div>
+            <FormularioAccion accion={investigacionDeChatAccion.bind(null, canal.slug)} boton="Guardar informe del chat" pendiente="Guardando…" className="mt-3 space-y-2">
+              <textarea name="informe" rows={8} required placeholder="Pega aquí el informe completo, con sus enlaces" aria-label="Informe del chat" className={`${claseCampo} font-mono text-xs`} />
+            </FormularioAccion>
+          </details>
         )}
       </div>
 

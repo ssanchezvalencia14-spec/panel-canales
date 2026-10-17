@@ -15,7 +15,7 @@ export default async function Auditoria() {
   const usuario = await requireUsuario();
   if (!puedeAdministrarRed(usuario)) notFound();
   const [a, respaldos] = await Promise.all([auditoriaRed(prisma, usuario), listarRespaldos()]);
-  const faltan = a.configuracion.filter((c) => !c.definida && c.nombre !== "RESPALDOS_DIR");
+  const faltan = a.configuracion.filter((c) => !c.definida && c.nombre !== "RESPALDOS_DIR" && c.nombre !== "ANTHROPIC_API_KEY");
 
   return (
     <section className="space-y-6">

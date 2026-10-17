@@ -11,6 +11,7 @@ import { fechaLocal, fechaLocalAUtc } from "@/lib/dominio/fechas";
 import { puntuarGancho } from "@/lib/puntaje/gancho";
 import { limitesDeCanal, revisarTitulo } from "@/lib/puntaje/titulo";
 import { costoDe, costoMaximo, construirPrompt, ErrorGenerador, MODELO_GUION, type Generador, type PedidoGuion } from "@/lib/ia/guion";
+import { leerRespuestaGuion, MODELO_CHAT } from "@/lib/ia/chat";
 import { AccesoDenegado, cambiarEstadoVideo, NoEncontrado, TransicionInvalida, type UsuarioSesion } from "./acceso";
 import { DatoInvalido } from "./metricas";
 
@@ -456,20 +457,28 @@ export function pedidoDeVideo(v: VideoParaGuion): PedidoGuion {
   };
 }
 
-export async function generarBorradorGuion(db: Db, u: UsuarioSesion, canalId: string, videoId: string, generar: Generador) {
+export async function generarBorradorGuion(
+  db: Db,
+  u: UsuarioSesion,
+  canalId: string,
+  videoId: string,
+  generar: Generador,
+  opciones: { externo?: boolean } = {},
+) {
   exigir(u, canalId, "editar_video", "Tu rol no permite generar guiones.");
   const v = await videoDelCanal(db, canalId, videoId);
   const pedido = pedidoDeVideo(v);
   const { system, usuario } = construirPrompt(pedido);
   // Antes de gastar: el peor caso de esta llamada tiene que caber en el tope.
-  await exigirTope(db, canalId, videoId, costoMaximo(system.length + usuario.length));
+  // Lo generado en un chat externo no gasta nada en el panel.
+  if (!opciones.externo) await exigirTope(db, canalId, videoId, costoMaximo(system.length + usuario.length));
 
   const ejecucion = await db.ejecucion.create({
-    data: { canalId, videoId, tipo: "guion_ia", estado: "en_curso", registradoPorId: u.id, log: `Modelo pedido: ${MODELO_GUION}` },
+    data: { canalId, videoId, tipo: "guion_ia", estado: "en_curso", registradoPorId: u.id, log: opciones.externo ? "Pegado desde un chat externo" : `Modelo pedido: ${MODELO_GUION}` },
   });
   try {
     const r = await generar(pedido);
-    const costo = costoDe(r.modelo, r.uso);
+    const costo = opciones.externo ? { usd: 0, estimado: false } : costoDe(r.modelo, r.uso);
     const ultima = await db.guion.aggregate({ where: { videoId }, _max: { version: true } });
     const guion = await db.guion.create({
       data: {
@@ -499,8 +508,10 @@ export async function generarBorradorGuion(db: Db, u: UsuarioSesion, canalId: st
         estado: "ok",
         costo: costo.usd,
         log: [
-          `Modelo: ${r.modelo}${r.fallback ? " (respaldo tras un rechazo del modelo principal)" : ""}`,
-          `Tokens: ${r.uso.input_tokens} de entrada, ${r.uso.output_tokens} de salida`,
+          opciones.externo
+            ? `Generado en un chat externo (sin API) y pegado por ${u.email}`
+            : `Modelo: ${r.modelo}${r.fallback ? " (respaldo tras un rechazo del modelo principal)" : ""}`,
+          opciones.externo ? "" : `Tokens: ${r.uso.input_tokens} de entrada, ${r.uso.output_tokens} de salida`,
           `Costo: US$ ${costo.usd.toFixed(4)}${costo.estimado ? " (estimado)" : ""}`,
           `Guion v${guion.version}: ${r.borrador.guion.split(/\s+/).length} palabras, ${r.borrador.cifras.length} cifras a verificar`,
           r.borrador.notas ? `Notas del modelo: ${r.borrador.notas}` : "",
@@ -516,6 +527,19 @@ export async function generarBorradorGuion(db: Db, u: UsuarioSesion, canalId: st
     if (e instanceof ErrorGenerador) throw new DatoInvalido(e.message);
     throw new DatoInvalido("No se pudo generar el borrador. El error quedó en el registro de ejecuciones.");
   }
+}
+
+/** Modo chat: guarda la respuesta pegada como una versión del guion y llena el checklist de cifras. */
+export async function importarGuionDeChat(db: Db, u: UsuarioSesion, canalId: string, videoId: string, texto: string) {
+  exigir(u, canalId, "editar_video", "Tu rol no permite generar guiones.");
+  let borrador: ReturnType<typeof leerRespuestaGuion>;
+  try {
+    borrador = leerRespuestaGuion(texto);
+  } catch (e) {
+    throw new DatoInvalido(e instanceof Error ? e.message : String(e));
+  }
+  const pegado: Generador = async () => ({ borrador, modelo: MODELO_CHAT, uso: { input_tokens: 0, output_tokens: 0 }, fallback: false });
+  return generarBorradorGuion(db, u, canalId, videoId, pegado, { externo: true });
 }
 
 export async function guardarGuionManual(db: Db, u: UsuarioSesion, canalId: string, videoId: string, contenido: string) {
