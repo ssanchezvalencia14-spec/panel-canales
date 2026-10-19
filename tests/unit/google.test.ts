@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { firmarEstado, verificarEstado } from "@/lib/google/estado";
-import { urlDeAutorizacion, ALCANCES_GOOGLE } from "@/lib/google/cliente";
+import { ALCANCE, ALCANCES_GOOGLE, conexionDeAlcance, urlDeAutorizacion } from "@/lib/google/cliente";
 import { eventosDeseados } from "@/server/sincronizacion";
 import { emparejar, mismoTitulo } from "@/lib/metricas/emparejar";
 
@@ -23,8 +23,21 @@ describe("state de OAuth", () => {
     const u = new URL(urlDeAutorizacion({ clientId: "id", clientSecret: "x", redirectUri: "https://p.test/cb" }, "st"));
     expect(u.searchParams.get("access_type")).toBe("offline");
     expect(u.searchParams.get("prompt")).toBe("consent");
-    expect(u.searchParams.get("scope")!.split(" ")).toEqual([...ALCANCES_GOOGLE]);
+    expect(u.searchParams.get("scope")!.split(" ")).toEqual([ALCANCE.youtube, ALCANCE.analytics, ALCANCE.calendario]);
+    expect(u.searchParams.get("include_granted_scopes")).toBe("false");
     expect(u.searchParams.get("state")).toBe("st");
+  });
+
+  it("Drive va en una autorización aparte: Google no deja pedirlo junto con YouTube", () => {
+    const cfg = { clientId: "id", clientSecret: "x", redirectUri: "https://p.test/cb" };
+    const drive = new URL(urlDeAutorizacion(cfg, "st", "google_drive")).searchParams.get("scope")!.split(" ");
+    const yt = new URL(urlDeAutorizacion(cfg, "st")).searchParams.get("scope")!.split(" ");
+    expect(drive).toEqual([ALCANCE.drive]);
+    expect(yt).not.toContain(ALCANCE.drive);
+    // Entre las dos conexiones se cubren todos los permisos del panel.
+    expect([...yt, ...drive].sort()).toEqual([...ALCANCES_GOOGLE].sort());
+    expect(conexionDeAlcance(ALCANCE.drive)).toBe("google_drive");
+    expect(conexionDeAlcance(ALCANCE.youtube)).toBe("google");
   });
 });
 

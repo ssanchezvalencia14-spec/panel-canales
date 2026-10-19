@@ -3,7 +3,7 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export type EstadoOAuth = { canalId: string; userId: string; vence: number };
+export type EstadoOAuth = { canalId: string; userId: string; vence: number; tipo?: "google" | "google_drive" };
 
 function secreto(valor = process.env.AUTH_SECRET): string {
   if (!valor) throw new Error("Falta la variable de entorno AUTH_SECRET.");

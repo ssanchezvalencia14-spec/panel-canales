@@ -147,7 +147,7 @@ curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<dominio>/api/cron/sin
 2. Configura la pantalla de consentimiento (tipo *Externo*) y añade como usuarios de prueba las cuentas que conectarán canales. Mientras la app esté en modo *Testing*, Google vence el permiso a los 7 días y hay que reconectar; para evitarlo, publica la app.
 3. Crea credenciales **ID de cliente OAuth → Aplicación web**, con la URI de redirección `https://<dominio>/api/integraciones/google/callback`.
 4. En las variables del sitio, añade `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `INTEGRACIONES_CLAVE` y `CRON_SECRET` desde hPanel. No uses el reemplazo por API, que borra las demás.
-5. Un admin del canal entra en **Estadísticas → Conectar Google** con la cuenta dueña del canal de YouTube. El permiso se guarda **cifrado** (AES-256-GCM) y se revoca al desconectar.
+5. Un admin del canal entra en **Estadísticas → Integraciones** con la cuenta dueña del canal de YouTube y conecta en dos pasos: **YouTube y Calendar** y luego **Drive**. Google rechaza pedir YouTube y Drive en una misma autorización («scopes that cannot be requested together»), así que cada conexión guarda su propio permiso. El permiso se guarda **cifrado** (AES-256-GCM) y se revoca al desconectar.
 6. Sincroniza con **Sincronizar ahora**, o programa el cron del hosting:
 
    ```bash

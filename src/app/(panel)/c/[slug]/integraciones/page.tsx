@@ -6,14 +6,15 @@ import { configOAuthDesdeEntorno } from "@/lib/google/cliente";
 import { prisma } from "@/server/db";
 import { obtenerCanalPorSlug } from "@/server/acceso";
 import { cambiarCalendarioAccion, desconectarAccion, sincronizarAccion } from "@/server/acciones/integraciones";
-import { integracionDeCanal } from "@/server/metricas";
+import { conexionDriveDeCanal, integracionDeCanal } from "@/server/metricas";
 import { requireUsuario } from "@/server/sesion";
 
 const ERRORES: Record<string, string> = {
   "sin-config": "Falta configurar GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en el servidor.",
   cancelado: "La conexión se canceló en Google.",
   "sin-refresh": "Google no entregó un permiso permanente. Quita el acceso del panel en tu cuenta de Google y vuelve a conectar.",
-  permisos: "Faltan permisos: hay que aceptar YouTube (gestión y analíticas), Calendar y Drive.",
+  permisos: "Faltan permisos: hay que aceptar YouTube (gestión y analíticas) y Calendar.",
+  "permisos-drive": "Falta el permiso de Google Drive: vuelve a conectar Drive y acéptalo.",
   google: "Google rechazó la conexión. Inténtalo de nuevo en unos minutos.",
 };
 
@@ -24,7 +25,7 @@ export default async function Integraciones({ params, searchParams }: PageProps<
   const canal = await obtenerCanalPorSlug(prisma, usuario, slug);
   if (!canal) notFound();
 
-  const integ = await integracionDeCanal(prisma, usuario, canal.id);
+  const [integ, drive] = await Promise.all([integracionDeCanal(prisma, usuario, canal.id), conexionDriveDeCanal(prisma, usuario, canal.id)]);
   const admin = puede(usuario, canal.id, "configurar_canal");
   const configurado = Boolean(configOAuthDesdeEntorno());
 
@@ -34,7 +35,12 @@ export default async function Integraciones({ params, searchParams }: PageProps<
         ← Estadísticas
       </Link>
       <h2 className="text-lg font-semibold">Google: YouTube y Calendar</h2>
-      {ok === "conectado" && <p className="rounded-md border border-emerald-900 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">Google conectado.</p>}
+      {ok === "conectado" && (
+        <p className="rounded-md border border-emerald-900 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
+          YouTube y Calendar conectados.{drive ? "" : " Falta conectar Google Drive (paso 2, abajo)."}
+        </p>
+      )}
+      {ok === "drive" && <p className="rounded-md border border-emerald-900 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">Google Drive conectado.</p>}
       {typeof error === "string" && (
         <p role="alert" className="rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-sm text-red-200">
           {ERRORES[error] ?? "No se pudo conectar con Google."}
@@ -92,7 +98,7 @@ export default async function Integraciones({ params, searchParams }: PageProps<
               className={`rounded-md px-3 py-2 text-sm font-semibold ${configurado ? "bg-acento text-fondo" : "pointer-events-none border border-borde text-suave"}`}
               aria-disabled={!configurado}
             >
-              {integ ? "Volver a conectar" : "Conectar con Google"}
+              {integ ? "Volver a conectar YouTube y Calendar" : "Paso 1 · Conectar YouTube y Calendar"}
             </a>
             {integ && (
               <>
@@ -101,7 +107,7 @@ export default async function Integraciones({ params, searchParams }: PageProps<
                   accion={desconectarAccion.bind(null, canal.slug)}
                   texto="Desconectar"
                   pendienteTexto="Desconectando…"
-                  confirmar="¿Desconectar Google de este canal? Las métricas ya guardadas se conservan."
+                  confirmar="¿Desconectar Google (YouTube, Calendar y Drive) de este canal? Las métricas ya guardadas se conservan."
                 />
               </>
             )}
@@ -113,6 +119,25 @@ export default async function Integraciones({ params, searchParams }: PageProps<
               <FormularioCalendario accion={cambiarCalendarioAccion.bind(null, canal.slug)} actual={integ.calendarioId} />
             </div>
           )}
+          <div className="rounded-lg border border-borde p-4 text-sm">
+            <p className="mb-1 font-medium">Paso 2 · Google Drive (carpeta y ficha de cada video)</p>
+            <p className="mb-3 text-xs text-suave">
+              Google no deja pedir Drive junto con YouTube, así que se conecta aparte. Usa la misma cuenta de Google. El panel solo ve los archivos que él
+              mismo crea.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className={drive ? "text-emerald-300" : "text-amber-300"}>
+                {drive ? `Conectado${drive.conectadoPor ? ` por ${drive.conectadoPor.email}` : ""}` : "Sin conectar"}
+              </span>
+              <a
+                href={`/api/integraciones/google/iniciar?canal=${encodeURIComponent(canal.slug)}&tipo=drive`}
+                className={`rounded-md px-3 py-2 text-sm font-semibold ${configurado ? (drive ? "border border-borde" : "bg-acento text-fondo") : "pointer-events-none border border-borde text-suave"}`}
+                aria-disabled={!configurado}
+              >
+                {drive ? "Volver a conectar Drive" : "Conectar Drive"}
+              </a>
+            </div>
+          </div>
         </div>
       ) : (
         <p className="text-sm text-suave">Solo un admin del canal puede conectar o sincronizar Google.</p>

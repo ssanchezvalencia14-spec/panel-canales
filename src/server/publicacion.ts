@@ -11,7 +11,7 @@ import { NOMBRE_ESTADO, ESTADOS_CON_APROBACION } from "@/lib/dominio/estados";
 import { fechaLocal, fechaLocalAUtc, formatearFechaHora } from "@/lib/dominio/fechas";
 import { descifrar } from "@/lib/cifrado";
 import { limitesDeCanal } from "@/lib/puntaje/titulo";
-import { ALCANCE, configOAuthDesdeEntorno, Google, tieneAlcance, tokenDeAcceso, type ConfigOAuth, type Fetch } from "@/lib/google/cliente";
+import { ALCANCE, conexionDeAlcance, configOAuthDesdeEntorno, Google, tieneAlcance, tokenDeAcceso, type ConfigOAuth, type Fetch } from "@/lib/google/cliente";
 import {
   borradorFicha,
   configFicha,
@@ -56,8 +56,17 @@ async function fuentesVerificadas(db: Db, canalId: string, videoId: string): Pro
 
 /** Cliente de Google del canal, comprobando que la conexión tenga el permiso pedido. */
 async function googleDeCanal(db: Db, canalId: string, alcance: string, deps: DepsGoogle) {
-  const integ = await db.integracion.findUnique({ where: { canalId_proveedor: { canalId, proveedor: "google" } } });
-  if (!integ) throw new DatoInvalido("El canal no tiene Google conectado (Estadísticas → Integraciones).");
+  // Drive tiene su propia conexión; si una conexión antigua ya traía el permiso, también sirve.
+  const tipo = conexionDeAlcance(alcance);
+  const conexiones = await db.integracion.findMany({ where: { canalId, proveedor: { in: [tipo, "google"] } } });
+  const integ = conexiones.find((c) => c.proveedor === tipo) ?? conexiones.find((c) => tieneAlcance(c.alcances, alcance)) ?? null;
+  if (!integ) {
+    throw new DatoInvalido(
+      tipo === "google_drive"
+        ? "El canal no tiene Google Drive conectado (Estadísticas → Integraciones → Conectar Drive)."
+        : "El canal no tiene Google conectado (Estadísticas → Integraciones).",
+    );
+  }
   if (!tieneAlcance(integ.alcances, alcance)) {
     throw new DatoInvalido("La conexión con Google no tiene este permiso. Un admin debe volver a conectar Google en Integraciones.");
   }

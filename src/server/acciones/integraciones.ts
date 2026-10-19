@@ -46,11 +46,12 @@ export async function desconectarAccion(slug: string, prev: Resultado): Promise<
   void prev; // firma de useActionState
   try {
     const { usuario, canal } = await canalDe(slug);
-    const cifrado = await desconectarGoogle(prisma, usuario, canal.id);
-    try {
-      await revocar(descifrar(cifrado));
-    } catch {
-      // Si no se puede revocar (clave cambiada, red), la conexión igual queda borrada del panel.
+    for (const cifrado of await desconectarGoogle(prisma, usuario, canal.id)) {
+      try {
+        await revocar(descifrar(cifrado));
+      } catch {
+        // Si no se puede revocar (clave cambiada, red), la conexión igual queda borrada del panel.
+      }
     }
     revalidatePath(`/c/${slug}`, "layout");
     return { ok: "Google desconectado. Los datos ya guardados se conservan." };

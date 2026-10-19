@@ -22,6 +22,18 @@ export const ALCANCE = {
 
 export const ALCANCES_GOOGLE = [ALCANCE.youtube, ALCANCE.analytics, ALCANCE.calendario, ALCANCE.drive] as const;
 
+/**
+ * Google rechaza pedir los permisos de YouTube junto con Drive en una misma
+ * autorización («scopes that cannot be requested together»). Por eso hay dos
+ * conexiones por canal, cada una con su permiso permanente.
+ */
+export type TipoConexion = "google" | "google_drive";
+export const ALCANCES_POR_CONEXION: Record<TipoConexion, readonly string[]> = {
+  google: [ALCANCE.youtube, ALCANCE.analytics, ALCANCE.calendario],
+  google_drive: [ALCANCE.drive],
+};
+export const conexionDeAlcance = (alcance: string): TipoConexion => (alcance === ALCANCE.drive ? "google_drive" : "google");
+
 /** Lectura de YouTube: vale el permiso completo o el antiguo de solo lectura. */
 export function tieneAlcance(concedidos: string, alcance: string): boolean {
   const lista = concedidos.split(/\s+/);
@@ -65,16 +77,17 @@ export function configOAuthDesdeEntorno(): ConfigOAuth | null {
   return { clientId, clientSecret, redirectUri: new URL("/api/integraciones/google/callback", base).toString() };
 }
 
-export function urlDeAutorizacion(cfg: ConfigOAuth, state: string): string {
+export function urlDeAutorizacion(cfg: ConfigOAuth, state: string, tipo: TipoConexion = "google"): string {
   const u = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   u.search = new URLSearchParams({
     client_id: cfg.clientId,
     redirect_uri: cfg.redirectUri,
     response_type: "code",
-    scope: ALCANCES_GOOGLE.join(" "),
+    scope: ALCANCES_POR_CONEXION[tipo].join(" "),
     access_type: "offline",
     prompt: "consent",
-    include_granted_scopes: "true",
+    // Sin sumar permisos ya concedidos: sumarlos volvería a mezclar YouTube con Drive.
+    include_granted_scopes: "false",
     state,
   }).toString();
   return u.toString();

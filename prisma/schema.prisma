@@ -338,7 +338,10 @@ enum FuenteMetrica {
 // ─────────────────────────── Integraciones ───────────────────────────
 
 enum ProveedorIntegracion {
+  /// YouTube (gestión y analíticas) y Calendar
   google
+  /// Google Drive, en una autorización aparte: Google no deja pedirlo junto con YouTube
+  google_drive
 }
 
 /// Conexión de un canal con un servicio externo (Google: YouTube Analytics + Calendar).

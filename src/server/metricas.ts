@@ -296,6 +296,15 @@ export async function integracionDeCanal(db: Db, usuario: UsuarioSesion, canalId
   });
 }
 
+/** Conexión de Google Drive del canal (aparte de la de YouTube y Calendar). */
+export async function conexionDriveDeCanal(db: Db, usuario: UsuarioSesion, canalId: string) {
+  exigir(usuario, canalId, "ver");
+  return db.integracion.findUnique({
+    where: { canalId_proveedor: { canalId, proveedor: "google_drive" } },
+    select: { id: true, alcances: true, creadoEn: true, conectadoPor: { select: { email: true } } },
+  });
+}
+
 export async function cambiarCalendario(db: Db, usuario: UsuarioSesion, canalId: string, calendarioId: string) {
   exigir(usuario, canalId, "configurar_canal", "Solo un admin del canal puede cambiar el calendario.");
   const id = calendarioId.trim();
@@ -304,12 +313,13 @@ export async function cambiarCalendario(db: Db, usuario: UsuarioSesion, canalId:
   if (count === 0) throw new NoEncontrado("El canal no tiene Google conectado.");
 }
 
+/** Borra las conexiones de Google del canal (YouTube + Calendar y Drive). Devuelve los tokens para revocarlos. */
 export async function desconectarGoogle(db: Db, usuario: UsuarioSesion, canalId: string) {
   exigir(usuario, canalId, "configurar_canal", "Solo un admin del canal puede desconectar Google.");
-  const integ = await db.integracion.findUnique({ where: { canalId_proveedor: { canalId, proveedor: "google" } } });
-  if (!integ) throw new NoEncontrado("El canal no tiene Google conectado.");
-  await db.integracion.delete({ where: { id: integ.id } });
-  return integ.refreshTokenCifrado;
+  const conexiones = await db.integracion.findMany({ where: { canalId, proveedor: { in: ["google", "google_drive"] } } });
+  if (conexiones.length === 0) throw new NoEncontrado("El canal no tiene Google conectado.");
+  await db.integracion.deleteMany({ where: { id: { in: conexiones.map((c) => c.id) } } });
+  return conexiones.map((c) => c.refreshTokenCifrado);
 }
 
 export async function eventosDeCanal(db: Db, usuario: UsuarioSesion, canalId: string, desde: Date, hasta: Date) {
