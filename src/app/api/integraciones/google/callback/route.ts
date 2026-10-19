@@ -6,6 +6,7 @@ import { ALCANCES_POR_CONEXION, configOAuthDesdeEntorno, Google, intercambiarCod
 import { verificarEstado } from "@/lib/google/estado";
 import { log } from "@/lib/log";
 import { prisma } from "@/lib/prisma-global";
+import { urlPublica } from "@/lib/url";
 import { cargarUsuario } from "@/server/acceso";
 
 // Vuelta de Google: valida el «state», guarda el refresh token cifrado de la
@@ -13,17 +14,17 @@ import { cargarUsuario } from "@/server/acceso";
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
   const estado = verificarEstado(p.get("state") ?? "");
-  if (!estado) return NextResponse.redirect(new URL("/?aviso=sin-acceso", req.url));
+  if (!estado) return NextResponse.redirect(urlPublica("/?aviso=sin-acceso", req.url));
   const tipo = estado.tipo ?? "google";
 
   const canal = await prisma.canal.findUnique({ where: { id: estado.canalId }, select: { id: true, slug: true } });
-  if (!canal) return NextResponse.redirect(new URL("/", req.url));
-  const volver = (q: string) => NextResponse.redirect(new URL(`/c/${canal.slug}/integraciones?${q}`, req.url));
+  if (!canal) return NextResponse.redirect(urlPublica("/", req.url));
+  const volver = (q: string) => NextResponse.redirect(urlPublica(`/c/${canal.slug}/integraciones?${q}`, req.url));
 
   const sesion = await auth();
   const usuario = sesion?.user?.id ? await cargarUsuario(prisma, sesion.user.id) : null;
   if (!usuario || usuario.id !== estado.userId || !puede(usuario, canal.id, "configurar_canal")) {
-    return NextResponse.redirect(new URL("/?aviso=sin-acceso", req.url));
+    return NextResponse.redirect(urlPublica("/?aviso=sin-acceso", req.url));
   }
   if (p.get("error")) return volver("error=cancelado");
 
@@ -51,6 +52,7 @@ export async function GET(req: NextRequest) {
     return volver(tipo === "google_drive" ? "ok=drive" : "ok=conectado");
   } catch (e) {
     log.error("google_conectar_fallido", { tipo, error: e });
+    if (e instanceof Error && e.message.includes("INTEGRACIONES_CLAVE")) return volver("error=clave");
     return volver("error=google");
   }
 }

@@ -16,6 +16,7 @@ const ERRORES: Record<string, string> = {
   permisos: "Faltan permisos: hay que aceptar YouTube (gestión y analíticas) y Calendar.",
   "permisos-drive": "Falta el permiso de Google Drive: vuelve a conectar Drive y acéptalo.",
   google: "Google rechazó la conexión. Inténtalo de nuevo en unos minutos.",
+  clave: "La variable INTEGRACIONES_CLAVE del servidor no es válida: debe ser una clave de 32 bytes en base64. Corrígela en hPanel y vuelve a conectar.",
 };
 
 export default async function Integraciones({ params, searchParams }: PageProps<"/c/[slug]/integraciones">) {

@@ -4,6 +4,7 @@ import { puede } from "@/lib/dominio/roles";
 import { configOAuthDesdeEntorno, urlDeAutorizacion, type TipoConexion } from "@/lib/google/cliente";
 import { firmarEstado } from "@/lib/google/estado";
 import { prisma } from "@/lib/prisma-global";
+import { urlPublica } from "@/lib/url";
 import { cargarUsuario, obtenerCanalPorSlug } from "@/server/acceso";
 
 // Inicia la conexión de un canal con Google. Solo admin del canal (o superadmin).
@@ -12,13 +13,13 @@ import { cargarUsuario, obtenerCanalPorSlug } from "@/server/acceso";
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get("canal") ?? "";
   const tipo: TipoConexion = req.nextUrl.searchParams.get("tipo") === "drive" ? "google_drive" : "google";
-  const volver = (q: string) => NextResponse.redirect(new URL(`/c/${encodeURIComponent(slug)}/integraciones?${q}`, req.url));
+  const volver = (q: string) => NextResponse.redirect(urlPublica(`/c/${encodeURIComponent(slug)}/integraciones?${q}`, req.url));
 
   const sesion = await auth();
   const usuario = sesion?.user?.id ? await cargarUsuario(prisma, sesion.user.id) : null;
-  if (!usuario) return NextResponse.redirect(new URL("/login", req.url));
+  if (!usuario) return NextResponse.redirect(urlPublica("/login", req.url));
   const canal = await obtenerCanalPorSlug(prisma, usuario, slug);
-  if (!canal || !puede(usuario, canal.id, "configurar_canal")) return NextResponse.redirect(new URL("/?aviso=sin-acceso", req.url));
+  if (!canal || !puede(usuario, canal.id, "configurar_canal")) return NextResponse.redirect(urlPublica("/?aviso=sin-acceso", req.url));
 
   const cfg = configOAuthDesdeEntorno();
   if (!cfg) return volver("error=sin-config");
