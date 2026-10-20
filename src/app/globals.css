@@ -1,14 +1,17 @@
 @import "tailwindcss";
 
-/* Tema neutro del panel. El acento (--acento) lo fija el canal activo
-   desde su configuración; fuera de un canal se usa el acento del panel. */
+/* Tema invisual: azul #1d44f9, lima #ccf02a, blanco y Poppins. El fondo es un
+   azul muy oscuro derivado del azul de la marca para que las tablas y los
+   gráficos se lean cómodos. El acento (--acento) es la lima; dentro de un
+   canal toma el color del canal. */
 :root {
-  --fondo: #0a0a0a;
-  --superficie: #141416;
-  --borde: #26262a;
-  --texto: #ededef;
-  --texto-suave: #a1a1aa;
-  --acento: #d4d4d8;
+  --fondo: #0a1140;
+  --superficie: #101a5c;
+  --borde: #24339a;
+  --texto: #ffffff;
+  --texto-suave: #aab5ef;
+  --acento: #ccf02a;
+  --azul: #1d44f9;
   color-scheme: dark;
 }
 
@@ -19,7 +22,8 @@
   --color-texto: var(--texto);
   --color-suave: var(--texto-suave);
   --color-acento: var(--acento);
-  --font-sans: var(--font-geist-sans);
+  --color-azul: var(--azul);
+  --font-sans: var(--font-poppins);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -27,4 +31,14 @@ body {
   background: var(--fondo);
   color: var(--texto);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+::selection {
+  background: #ccf02a;
+  color: #0a1140;
+}
+
+:focus-visible {
+  outline: 2px solid #ccf02a;
+  outline-offset: 2px;
 }

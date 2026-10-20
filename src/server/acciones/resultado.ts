@@ -2,6 +2,7 @@ import { unstable_rethrow } from "next/navigation";
 import { ZodError } from "zod";
 import { SlugOcupado } from "@/lib/canales";
 import { log, referenciaError } from "@/lib/log";
+import { CanalNoEncontrado, ErrorYoutube, FaltaClaveYoutube } from "@/lib/youtube/publico";
 import { AccesoDenegado, NoEncontrado, TransicionInvalida } from "../acceso";
 
 export type Resultado = { ok?: string; error?: string } | null;
@@ -13,7 +14,15 @@ export type Resultado = { ok?: string; error?: string } | null;
  */
 export function aResultado(e: unknown): Resultado {
   unstable_rethrow(e);
-  if (e instanceof AccesoDenegado || e instanceof NoEncontrado || e instanceof TransicionInvalida || e instanceof SlugOcupado) {
+  if (
+    e instanceof AccesoDenegado ||
+    e instanceof NoEncontrado ||
+    e instanceof TransicionInvalida ||
+    e instanceof SlugOcupado ||
+    e instanceof CanalNoEncontrado ||
+    e instanceof FaltaClaveYoutube ||
+    e instanceof ErrorYoutube
+  ) {
     return { error: e.message };
   }
   if (e instanceof ZodError) {

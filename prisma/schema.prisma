@@ -165,6 +165,19 @@ model Canal {
   creadoEn         DateTime @default(now()) @map("creado_en")
   actualizadoEn    DateTime @updatedAt @map("actualizado_en")
 
+  /// Canal de YouTube vinculado por enlace (datos públicos, sin iniciar sesión).
+  youtubeCanalId      String?   @unique @map("youtube_canal_id") @db.VarChar(64)
+  youtubeHandle       String?   @map("youtube_handle") @db.VarChar(100)
+  avatarUrl           String?   @map("avatar_url") @db.Text
+  suscriptores        Int?
+  vistasTotales       BigInt?   @map("vistas_totales")
+  videosTotales       Int?      @map("videos_totales")
+  statsActualizadasEn DateTime? @map("stats_actualizadas_en")
+  statsError          String?   @map("stats_error") @db.Text
+
+  videosYoutube VideoYoutube[]
+  snapshots     CanalSnapshot[]
+
   membresias    Membresia[]
   videos        Video[]
   tareas        Tarea[]
@@ -530,4 +543,42 @@ model Informe {
   @@unique([canalId, tipo, semana])
   @@index([canalId, creadoEn])
   @@map("informes")
+}
+
+// ─────────────────────────── YouTube público ───────────────────────────
+// Datos que cualquiera puede ver de un canal (se leen con la API pública de
+// YouTube a partir del enlace del canal; no piden contraseña ni permiso).
+
+/// Video publicado de un canal vinculado por enlace, con sus cifras públicas.
+model VideoYoutube {
+  canalId       String   @map("canal_id")
+  youtubeId     String   @map("youtube_id") @db.VarChar(16)
+  titulo        String   @db.VarChar(300)
+  miniaturaUrl  String?  @map("miniatura_url") @db.Text
+  publicadoEn   DateTime @map("publicado_en")
+  duracionSeg   Int?     @map("duracion_seg")
+  vistas        Int?
+  likes         Int?
+  comentarios   Int?
+  actualizadoEn DateTime @default(now()) @updatedAt @map("actualizado_en")
+
+  canal Canal @relation(fields: [canalId], references: [id], onDelete: Cascade)
+
+  @@id([canalId, youtubeId])
+  @@index([canalId, publicadoEn])
+  @@map("videos_youtube")
+}
+
+/// Foto diaria de los totales del canal, para ver cuánto crece.
+model CanalSnapshot {
+  canalId       String   @map("canal_id")
+  fecha         DateTime @db.Date
+  suscriptores  Int?
+  vistasTotales BigInt?  @map("vistas_totales")
+  videosTotales Int?     @map("videos_totales")
+
+  canal Canal @relation(fields: [canalId], references: [id], onDelete: Cascade)
+
+  @@id([canalId, fecha])
+  @@map("canal_snapshots")
 }

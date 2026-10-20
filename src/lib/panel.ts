@@ -3,7 +3,7 @@
 
 import { colorSeguro } from "./dominio/canal-config";
 
-export const ACENTO_PANEL_POR_DEFECTO = "#d4d4d8";
+export const ACENTO_PANEL_POR_DEFECTO = "#ccf02a";
 
 export function nombrePanel(): string {
   return process.env.PANEL_NOMBRE?.trim() || "Panel de canales";
