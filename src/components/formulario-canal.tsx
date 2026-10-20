@@ -25,7 +25,7 @@ const ayuda = "mt-1 text-xs text-suave";
 
 export function FormularioCanal({ accion, zonas }: Props) {
   const [resultado, enviar, pendiente] = useActionState(accion, null);
-  const [color, setColor] = useState("#d4d4d8");
+  const [color, setColor] = useState("#ccf02a");
 
   return (
     <form

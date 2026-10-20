@@ -7,12 +7,16 @@ import { prisma } from "@/server/db";
 import { resumenRed } from "@/server/acceso";
 import { requireUsuario } from "@/server/sesion";
 import { alertasAbiertasPorCanal } from "@/server/automatizaciones";
+import { compacto, conSigno } from "@/lib/formato";
+import { estadisticasGlobales } from "@/server/youtube-publico";
 
 export default async function VistaRed({ searchParams }: PageProps<"/">) {
   const usuario = await requireUsuario();
   const resumen = await resumenRed(prisma, usuario);
   const alertas = await alertasAbiertasPorCanal(prisma, resumen.map((r) => r.canal.id));
   const { aviso } = await searchParams;
+  const stats = await estadisticasGlobales(prisma, usuario);
+  const porSlug = new Map(stats.tarjetas.map((t) => [t.slug, t]));
 
   return (
     <section>
@@ -22,13 +26,13 @@ export default async function VistaRed({ searchParams }: PageProps<"/">) {
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">Red</h1>
+        <h1 className="text-2xl font-semibold">Inicio</h1>
         {usuario.esSuperadmin && (
           <Link
-            href="/canales/nuevo"
+            href="/canales"
             className="ml-auto rounded-md bg-acento px-3 py-1.5 text-sm font-semibold text-fondo hover:opacity-90"
           >
-            + Nuevo canal
+            + Agregar canal
           </Link>
         )}
       </div>
@@ -45,7 +49,7 @@ export default async function VistaRed({ searchParams }: PageProps<"/">) {
           {resumen.map(({ canal, total, porEstado, proxima }) => (
             <li key={canal.id}>
               <Link
-                href={`/c/${canal.slug}/calendario`}
+                href={`/estadisticas?canal=${encodeURIComponent(canal.slug)}`}
                 style={{ "--acento": colorSeguro(canal.colorAcento, acentoPanel()) } as React.CSSProperties}
                 className="block rounded-xl border border-borde bg-superficie p-5 transition hover:border-acento"
               >
@@ -61,6 +65,13 @@ export default async function VistaRed({ searchParams }: PageProps<"/">) {
                     </span>
                   )}
                 </div>
+                {porSlug.get(canal.slug)?.vinculado && (
+                  <p className="mt-3 text-sm tabular-nums">
+                    <span className="font-semibold">{compacto(porSlug.get(canal.slug)!.suscriptores)}</span> suscriptores
+                    <span className="text-suave"> · {conSigno(porSlug.get(canal.slug)!.subs28)} en 28 d · </span>
+                    <span className="font-semibold">{compacto(porSlug.get(canal.slug)!.vistasTotales)}</span> vistas
+                  </p>
+                )}
                 <dl className="mt-4 grid grid-cols-4 gap-2 text-center text-xs">
                   {ESTADOS_VIDEO.map((e) => (
                     <div key={e} className="rounded-md bg-fondo px-1 py-2">

@@ -19,7 +19,6 @@ export default async function PanelLayout({ children }: LayoutProps<"/">) {
     <>
       <BarraSuperior
         panel={nombrePanel()}
-        canales={canales.map((c) => ({ slug: c.slug, nombre: c.nombre }))}
         usuario={{
           nombre: usuario.nombre ?? usuario.email,
           detalle: usuario.esSuperadmin ? "Superadmin de red" : `${canales.length} canal(es)`,
@@ -28,7 +27,7 @@ export default async function PanelLayout({ children }: LayoutProps<"/">) {
       />
       <div className="md:flex">
         <BarraLateral esSuperadmin={usuario.esSuperadmin} canales={canales.map((c) => ({ slug: c.slug }))} />
-        <main className="min-w-0 flex-1 px-4 py-8 md:px-8">{children}</main>
+        <main className="min-w-0 flex-1 px-4 py-8 md:px-10">{children}</main>
       </div>
     </>
   );
