@@ -48,13 +48,13 @@ export default async function Ejecuciones({ params }: PageProps<"/c/[slug]/ejecu
       </p>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border border-borde bg-superficie p-4">
+        <div className="rounded-2xl border border-borde bg-superficie p-4 sm:p-5">
           <p className="text-xs text-suave">Gasto registrado (últimas 200)</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{usd(total)}</p>
+          <p className="mt-1 text-3xl font-bold tabular-nums">{usd(total)}</p>
         </div>
-        <div className="rounded-lg border border-borde bg-superficie p-4 md:col-span-2">
+        <div className="rounded-2xl border border-borde bg-superficie p-4 sm:p-5 md:col-span-2">
           <p className="text-xs text-suave">Tope de gasto por video</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{tope === null ? "Sin tope" : usd(tope)}</p>
+          <p className="mt-1 text-3xl font-bold tabular-nums">{tope === null ? "Sin tope" : usd(tope)}</p>
           {admin && (
             <FormularioAccion accion={topeCanalAccion.bind(null, canal.slug)} boton="Guardar tope" variante="secundario" className="mt-2 flex flex-wrap items-end gap-2">
               <label className="text-sm">
@@ -67,7 +67,7 @@ export default async function Ejecuciones({ params }: PageProps<"/c/[slug]/ejecu
         </div>
       </div>
 
-      <div className="rounded-lg border border-borde bg-superficie p-4">
+      <div className="rounded-2xl border border-borde bg-superficie p-4 sm:p-5">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <h2 className="font-semibold">Gasto del mes {mes.mes}</h2>
           <p className="text-2xl font-semibold tabular-nums">
@@ -112,7 +112,7 @@ export default async function Ejecuciones({ params }: PageProps<"/c/[slug]/ejecu
       </div>
 
       {conGasto.length > 0 && (
-        <div className="rounded-lg border border-borde bg-superficie p-4">
+        <div className="rounded-2xl border border-borde bg-superficie p-4 sm:p-5">
           <h2 className="font-semibold">Gasto por video</h2>
           <ul className="mt-2 space-y-1 text-sm">
             {conGasto.map(([id, g]) => (
@@ -131,7 +131,7 @@ export default async function Ejecuciones({ params }: PageProps<"/c/[slug]/ejecu
       )}
 
       {edita && (
-        <details className="rounded-lg border border-borde bg-superficie p-4">
+        <details className="rounded-2xl border border-borde bg-superficie p-4 sm:p-5">
           <summary className="cursor-pointer font-semibold">Registrar tarea externa</summary>
           <FormularioEjecucion slug={canal.slug} videoId={null} videos={videos.map((v) => ({ id: v.id, titulo: v.titulo }))} />
         </details>
@@ -139,7 +139,7 @@ export default async function Ejecuciones({ params }: PageProps<"/c/[slug]/ejecu
 
       <TablaEjecuciones slug={canal.slug} ejecuciones={ejecuciones} edita={edita} conVideo />
 
-      <div className="rounded-lg border border-borde bg-superficie p-4">
+      <div className="rounded-2xl border border-borde bg-superficie p-4 sm:p-5">
         <h2 className="font-semibold">Registro de actividad</h2>
         {actividad.length === 0 ? (
           <p className="mt-2 text-sm text-suave">Sin actividad todavía.</p>
