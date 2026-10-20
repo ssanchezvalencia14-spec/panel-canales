@@ -21,15 +21,15 @@ export function BarrasHorizontales({ datos, idioma, unidad = "vistas" }: { datos
       {datos.map((d, i) => (
         <li
           key={d.etiqueta}
-          className={`grid grid-cols-[minmax(6rem,12rem)_1fr_auto] items-center gap-3 rounded px-1 py-0.5 text-sm ${activa === i ? "bg-fondo" : ""}`}
+          className={`grid grid-cols-[minmax(5rem,11rem)_1fr_auto] items-center gap-3 rounded-lg px-2 py-1 text-sm ${activa === i ? "bg-fondo" : ""}`}
           onMouseEnter={() => setActiva(i)}
           title={`${d.etiqueta}: ${fmt(d.valor, idioma)} ${unidad}${d.detalle ? ` · ${d.detalle}` : ""}`}
         >
           <span className="truncate text-suave">{d.etiqueta}</span>
-          <span className="h-2.5" aria-hidden>
-            <span className="block h-full rounded-r bg-acento" style={{ width: `${Math.max(1, (d.valor / max) * 100)}%` }} />
+          <span className="h-3 overflow-hidden rounded-full bg-fondo" aria-hidden>
+            <span className="block h-full rounded-full bg-acento" style={{ width: `${Math.max(1, (d.valor / max) * 100)}%` }} />
           </span>
-          <span className="text-right tabular-nums">
+          <span className="text-right font-medium tabular-nums">
             {fmt(d.valor, idioma)}
             {activa === i && d.detalle && <span className="ml-2 text-xs text-suave">{d.detalle}</span>}
           </span>
@@ -49,10 +49,16 @@ export function LineaTiempo({ puntos, idioma, etiqueta }: { puntos: Punto[]; idi
   const W = 600;
   const H = 180;
   const m = { izq: 48, der: 12, arr: 12, aba: 24 };
-  const max = Math.max(1, ...puntos.map((p) => p.valor));
+  // Escala ajustada a los datos (con margen) para que el crecimiento se vea;
+  // el eje muestra el rango real, así que no exagera ni oculta el cambio.
+  const valores = puntos.map((p) => p.valor);
+  const bruto = { min: Math.min(...valores), max: Math.max(...valores) };
+  const holgura = Math.max(1, (bruto.max - bruto.min) * 0.15);
+  const min = Math.max(0, bruto.min - holgura);
+  const max = Math.max(min + 1, bruto.max + holgura);
   const x = (i: number) => m.izq + (puntos.length === 1 ? (W - m.izq - m.der) / 2 : (i / (puntos.length - 1)) * (W - m.izq - m.der));
-  const y = (v: number) => m.arr + (1 - v / max) * (H - m.arr - m.aba);
-  const lineas = [0, 0.5, 1].map((f) => f * max);
+  const y = (v: number) => m.arr + (1 - (v - min) / (max - min)) * (H - m.arr - m.aba);
+  const lineas = [0, 0.5, 1].map((f) => min + f * (max - min));
   const d = puntos.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.valor).toFixed(1)}`).join(" ");
   const sel = activo === null ? null : puntos[activo];
 
@@ -62,7 +68,7 @@ export function LineaTiempo({ puntos, idioma, etiqueta }: { puntos: Punto[]; idi
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
         role="img"
-        aria-label={`${etiqueta}: ${puntos.length} mediciones, máximo ${fmt(max, idioma)}`}
+        aria-label={`${etiqueta}: ${puntos.length} mediciones, de ${fmt(bruto.min, idioma)} a ${fmt(bruto.max, idioma)}`}
         onMouseLeave={() => setActivo(null)}
         onMouseMove={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
@@ -77,29 +83,30 @@ export function LineaTiempo({ puntos, idioma, etiqueta }: { puntos: Punto[]; idi
         {lineas.map((v) => (
           <g key={v}>
             <line x1={m.izq} x2={W - m.der} y1={y(v)} y2={y(v)} stroke="var(--borde)" strokeWidth="1" />
-            <text x={m.izq - 6} y={y(v) + 4} textAnchor="end" fontSize="10" fill="var(--texto-suave)">
+            <text x={m.izq - 6} y={y(v) + 4} textAnchor="end" fontSize="11" fill="var(--texto-suave)">
               {fmt(v, idioma)}
             </text>
           </g>
         ))}
-        <text x={m.izq} y={H - 6} fontSize="10" fill="var(--texto-suave)">
+        <text x={m.izq} y={H - 6} fontSize="11" fill="var(--texto-suave)">
           {puntos[0].fecha}
         </text>
         {puntos.length > 1 && (
-          <text x={W - m.der} y={H - 6} textAnchor="end" fontSize="10" fill="var(--texto-suave)">
+          <text x={W - m.der} y={H - 6} textAnchor="end" fontSize="11" fill="var(--texto-suave)">
             {puntos.at(-1)!.fecha}
           </text>
         )}
+        <path d={`${d} L${x(puntos.length - 1).toFixed(1)},${H - m.aba} L${x(0).toFixed(1)},${H - m.aba} Z`} fill="var(--acento)" opacity="0.12" />
         <path d={d} fill="none" stroke="var(--acento)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         {activo !== null && (
           <line x1={x(activo)} x2={x(activo)} y1={m.arr} y2={H - m.aba} stroke="var(--texto-suave)" strokeWidth="1" strokeDasharray="3 3" />
         )}
         {puntos.map((p, i) => (
-          <circle key={p.fecha} cx={x(i)} cy={y(p.valor)} r={activo === i ? 5 : 4} fill="var(--acento)" stroke="var(--superficie)" strokeWidth="2" />
+          <circle key={p.fecha} cx={x(i)} cy={y(p.valor)} r={activo === i ? 5 : puntos.length > 20 ? 0 : 4} fill="var(--acento)" stroke="var(--superficie)" strokeWidth="2" />
         ))}
       </svg>
       {sel && (
-        <div className="pointer-events-none absolute top-0 right-0 rounded-md border border-borde bg-fondo px-2 py-1 text-xs shadow">
+        <div className="pointer-events-none absolute top-0 right-0 rounded-lg border border-borde-campo bg-fondo px-2.5 py-1.5 text-xs shadow-lg">
           <span className="text-suave">{sel.fecha}</span> · <span className="tabular-nums">{fmt(sel.valor, idioma)}</span> {etiqueta}
         </div>
       )}

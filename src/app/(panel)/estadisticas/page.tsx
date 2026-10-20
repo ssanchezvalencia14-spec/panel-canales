@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ActualizarDatos } from "@/components/actualizar-datos";
+import { AvatarCanal } from "@/components/avatar-canal";
 import { FiltroCanal } from "@/components/filtro-canal";
 import { BarrasHorizontales, LineaTiempo } from "@/components/graficos";
 import { compacto, conSigno, entero, haceCuanto } from "@/lib/formato";
@@ -11,19 +12,20 @@ import { listarCanales } from "@/server/acceso";
 import { requireUsuario } from "@/server/sesion";
 import { estadisticasGlobales, type VideoDestacado } from "@/server/youtube-publico";
 
-function Kpi({ etiqueta, valor, detalle }: { etiqueta: string; valor: string; detalle?: string }) {
+function Kpi({ etiqueta, valor, detalle, destacado = false }: { etiqueta: string; valor: string; detalle?: string; destacado?: boolean }) {
   return (
-    <div className="rounded-xl border border-borde bg-superficie p-4">
-      <dt className="text-xs text-suave">{etiqueta}</dt>
-      <dd className="mt-1 text-3xl font-semibold tabular-nums">{valor}</dd>
-      {detalle && <p className="mt-1 text-xs text-suave">{detalle}</p>}
+    <div className={`relative overflow-hidden rounded-2xl border bg-superficie p-4 sm:p-5 ${destacado ? "border-primario/60" : "border-borde"}`}>
+      {destacado && <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-primario" />}
+      <dt className="text-xs font-medium tracking-wide text-suave uppercase">{etiqueta}</dt>
+      <dd className="mt-2 text-3xl leading-none font-bold tabular-nums sm:text-5xl">{valor}</dd>
+      {detalle && <p className="mt-2 text-xs text-suave sm:text-sm">{detalle}</p>}
     </div>
   );
 }
 
 function ListaVideos({ titulo, videos, mostrarCanal }: { titulo: string; videos: VideoDestacado[]; mostrarCanal: boolean }) {
   return (
-    <div className="rounded-xl border border-borde bg-superficie p-4">
+    <div className="rounded-2xl border border-borde bg-superficie p-4 sm:p-5">
       <h2 className="font-semibold">{titulo}</h2>
       {videos.length === 0 ? (
         <p className="mt-3 text-sm text-suave">Sin videos todavía.</p>
@@ -35,9 +37,11 @@ function ListaVideos({ titulo, videos, mostrarCanal }: { titulo: string; videos:
               <li key={`${v.canalSlug}-${v.youtubeId}`} className="flex items-center gap-3">
                 {mini ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={mini} alt="" loading="lazy" className="h-12 w-20 shrink-0 rounded-md object-cover" />
+                  <img src={mini} alt="" loading="lazy" className="h-12 w-20 shrink-0 rounded-lg object-cover" />
                 ) : (
-                  <span aria-hidden className="h-12 w-20 shrink-0 rounded-md bg-fondo" />
+                  <span aria-hidden className="inline-flex h-12 w-20 shrink-0 items-center justify-center rounded-lg bg-fondo text-suave">
+                    ▶
+                  </span>
                 )}
                 <div className="min-w-0 flex-1">
                   <a href={`https://www.youtube.com/watch?v=${v.youtubeId}`} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-sm font-medium hover:text-acento">
@@ -81,7 +85,7 @@ export default async function EstadisticasGlobales({ searchParams }: PageProps<"
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">Estadísticas</h1>
+        <h1 className="text-2xl font-semibold sm:text-3xl">Estadísticas</h1>
         <div className="ml-auto">
           <ActualizarDatos
             accion={actualizarAhoraAccion}
@@ -93,7 +97,7 @@ export default async function EstadisticasGlobales({ searchParams }: PageProps<"
       <FiltroCanal canales={filtro} actual={slug} ruta="/estadisticas" />
 
       {conFallo.length > 0 && (
-        <div role="alert" className="rounded-xl border border-red-800 bg-red-950/50 p-3 text-sm text-red-100">
+        <div role="alert" className="rounded-xl border border-red-400/60 bg-red-950/60 p-4 text-sm text-red-100">
           <p className="font-medium">No se pudieron actualizar {conFallo.length} canal(es):</p>
           <ul className="mt-1 list-disc pl-5 text-red-200">
             {conFallo.map((c) => (
@@ -106,7 +110,7 @@ export default async function EstadisticasGlobales({ searchParams }: PageProps<"
       )}
 
       {t.vinculados === 0 ? (
-        <div className="rounded-xl border border-dashed border-borde p-8 text-center">
+        <div className="rounded-2xl border border-dashed border-borde-campo p-8 text-center">
           <p className="text-lg font-semibold">Todavía no hay canales con estadísticas</p>
           <p className="mx-auto mt-2 max-w-md text-sm text-suave">
             {admin
@@ -114,7 +118,7 @@ export default async function EstadisticasGlobales({ searchParams }: PageProps<"
               : "Pide a un superadmin que agregue los canales pegando su enlace de YouTube."}
           </p>
           {admin && (
-            <Link href="/canales" className="mt-4 inline-block rounded-full bg-acento px-5 py-2.5 text-sm font-semibold text-fondo">
+            <Link href="/canales" className="btn-primario mt-4">
               Agregar un canal
             </Link>
           )}
@@ -122,14 +126,14 @@ export default async function EstadisticasGlobales({ searchParams }: PageProps<"
       ) : (
         <>
           <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Kpi etiqueta="Suscriptores" valor={compacto(t.suscriptores)} detalle={t.subs28 === null ? "El crecimiento aparece con el historial diario" : `${conSigno(t.subs28)} en 28 días · ${conSigno(t.subs7)} en 7 días`} />
+            <Kpi destacado etiqueta="Suscriptores" valor={compacto(t.suscriptores)} detalle={t.subs28 === null ? "El crecimiento aparece con el historial diario" : `${conSigno(t.subs28)} en 28 días · ${conSigno(t.subs7)} en 7 días`} />
             <Kpi etiqueta="Vistas totales" valor={compacto(t.vistasTotales)} detalle={`${entero(t.videosTotales)} videos en total`} />
             <Kpi etiqueta="Vistas de lo reciente" valor={compacto(t.vistasRecientes)} detalle={`${t.videosRecientes} video(s) de los últimos 28 días`} />
             <Kpi etiqueta="Canales" valor={String(t.vinculados)} detalle={t.vinculados < t.canales ? `${t.canales - t.vinculados} sin enlace de YouTube` : "todos con datos"} />
           </dl>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-xl border border-borde bg-superficie p-4">
+            <div className="rounded-2xl border border-borde bg-superficie p-4 sm:p-5">
               <h2 className="font-semibold">Suscriptores en el tiempo</h2>
               <div className="mt-3">
                 {d.serieSuscriptores.length > 1 ? (
@@ -140,7 +144,7 @@ export default async function EstadisticasGlobales({ searchParams }: PageProps<"
               </div>
             </div>
             {d.tarjetas.length > 1 ? (
-              <div className="rounded-xl border border-borde bg-superficie p-4">
+              <div className="rounded-2xl border border-borde bg-superficie p-4 sm:p-5">
                 <h2 className="font-semibold">Vistas de los últimos 28 días por canal</h2>
                 <p className="text-xs text-suave">Vistas acumuladas de los videos publicados en ese periodo</p>
                 <div className="mt-3">
@@ -152,7 +156,7 @@ export default async function EstadisticasGlobales({ searchParams }: PageProps<"
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-borde bg-superficie p-4">
+              <div className="rounded-2xl border border-borde bg-superficie p-4 sm:p-5">
                 <h2 className="font-semibold">Más vistos</h2>
                 <BarrasHorizontales idioma="es" unidad="vistas" datos={d.masVistos.slice(0, 6).map((v) => ({ etiqueta: v.titulo, valor: v.vistas ?? 0 }))} />
               </div>
@@ -160,9 +164,31 @@ export default async function EstadisticasGlobales({ searchParams }: PageProps<"
           </div>
 
           {d.tarjetas.length > 1 && (
-            <div className="rounded-xl border border-borde">
-              <h2 className="border-b border-borde bg-superficie px-4 py-2.5 font-semibold">Canales</h2>
-              <div className="overflow-x-auto">
+            <div className="overflow-hidden rounded-2xl border border-borde">
+              <h2 className="border-b border-borde bg-superficie px-4 py-3 font-semibold">Canales</h2>
+              {/* Móvil: una tarjeta por canal. */}
+              <ul className="divide-y divide-borde md:hidden">
+                {d.tarjetas.map((c) => (
+                  <li key={c.slug}>
+                    <Link href={`/estadisticas?canal=${encodeURIComponent(c.slug)}`} className="flex items-center gap-3 px-4 py-3 hover:bg-superficie">
+                      <AvatarCanal nombre={c.nombre} avatarUrl={c.avatarUrl} color={c.color} tamano="md" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{c.nombre}</p>
+                        <p className="truncate text-xs text-suave">
+                          {c.vinculado ? `${conSigno(c.subs28)} en 28 d · ${compacto(c.vistasTotales)} vistas · ${haceCuanto(c.actualizadoEn)}` : "Sin enlace de YouTube"}
+                        </p>
+                      </div>
+                      {c.vinculado && (
+                        <p className="text-right tabular-nums">
+                          <span className="block text-lg font-semibold">{compacto(c.suscriptores)}</span>
+                          <span className="text-xs text-suave">suscriptores</span>
+                        </p>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[680px] text-left text-sm">
                   <thead className="text-xs text-suave">
                     <tr>
@@ -180,12 +206,7 @@ export default async function EstadisticasGlobales({ searchParams }: PageProps<"
                         <tr key={c.slug} className="border-t border-borde tabular-nums">
                           <td className="px-4 py-2.5">
                             <Link href={`/estadisticas?canal=${encodeURIComponent(c.slug)}`} className="flex items-center gap-2.5 font-medium hover:text-acento">
-                              {avatar ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
-                              ) : (
-                                <span aria-hidden className="h-7 w-7 rounded-full" style={{ backgroundColor: c.color }} />
-                              )}
+                              <AvatarCanal nombre={c.nombre} avatarUrl={avatar} color={c.color} tamano="sm" />
                               <span>
                                 {c.nombre}
                                 {c.handle && <span className="ml-2 text-xs font-normal text-suave">{c.handle}</span>}
