@@ -24,33 +24,52 @@ export default async function Videos({ params }: PageProps<"/c/[slug]/videos">) 
   return (
     <section>
       <dl className="grid gap-3 text-sm sm:grid-cols-3">
-        <div className="rounded-lg border border-borde bg-superficie p-3">
-          <dt className="text-suave">Publicación</dt>
+        <div className="rounded-xl border border-borde bg-superficie p-3">
+          <dt className="text-xs text-suave">Publicación</dt>
           <dd className="mt-1">
             {dias} · {canal.horaPublicacion}
           </dd>
         </div>
-        <div className="rounded-lg border border-borde bg-superficie p-3">
-          <dt className="text-suave">Zona horaria e idioma</dt>
+        <div className="rounded-xl border border-borde bg-superficie p-3">
+          <dt className="text-xs text-suave">Zona horaria e idioma</dt>
           <dd className="mt-1">
             {canal.zonaHoraria} · {canal.idioma}
           </dd>
         </div>
-        <div className="rounded-lg border border-borde bg-superficie p-3">
-          <dt className="text-suave">Pilares</dt>
+        <div className="rounded-xl border border-borde bg-superficie p-3">
+          <dt className="text-xs text-suave">Pilares</dt>
           <dd className="mt-1">{pilares.join(" · ") || "Sin definir"}</dd>
         </div>
       </dl>
 
       <h2 className="mt-8 text-lg font-semibold">Videos ({videos.length})</h2>
       {videos.length === 0 ? (
-        <p className="mt-3 rounded-lg border border-borde bg-superficie p-6 text-sm text-suave">
+        <p className="mt-3 rounded-2xl border border-dashed border-borde-campo p-6 text-center text-sm text-suave">
           Este canal aún no tiene videos.
         </p>
       ) : (
-        <div className="mt-3 overflow-x-auto rounded-lg border border-borde">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-superficie text-suave">
+        <>
+        {/* Móvil: lista de tarjetas. */}
+        <ul className="mt-3 divide-y divide-borde overflow-hidden rounded-2xl border border-borde md:hidden">
+          {videos.map((v) => (
+            <li key={v.id}>
+              <Link href={`/c/${canal.slug}/videos/${v.id}`} className="block px-4 py-3 hover:bg-superficie">
+                <p className="font-medium">{v.titulo}</p>
+                <p className="mt-1 text-xs text-suave">
+                  {v.fechaPublicacion ? formatearFechaHora(v.fechaPublicacion, canal.zonaHoraria, canal.idioma) : "Sin fecha"}
+                  {v.pilar ? ` · ${v.pilar}` : ""}
+                </p>
+                <p className="mt-2 flex items-center gap-2 text-xs text-suave">
+                  <EstadoVideoChip estado={v.estado} />
+                  Fuentes {v.fuentesOk ? "verificadas" : "pendientes"}
+                </p>
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-3 hidden overflow-x-auto rounded-2xl border border-borde md:block">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-superficie text-xs text-suave">
               <tr>
                 <th className="px-3 py-2 font-medium">Publicación</th>
                 <th className="px-3 py-2 font-medium">Título</th>
@@ -68,7 +87,7 @@ export default async function Videos({ params }: PageProps<"/c/[slug]/videos">) 
                       : "Sin fecha"}
                   </td>
                   <td className="px-3 py-2">
-                    <Link href={`/c/${canal.slug}/videos/${v.id}`} className="hover:text-acento hover:underline">
+                    <Link href={`/c/${canal.slug}/videos/${v.id}`} className="font-medium hover:underline">
                       {v.titulo}
                     </Link>
                   </td>
@@ -82,6 +101,7 @@ export default async function Videos({ params }: PageProps<"/c/[slug]/videos">) 
             </tbody>
           </table>
         </div>
+        </>
       )}
     </section>
   );
