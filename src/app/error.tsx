@@ -14,10 +14,10 @@ export default function ErrorPagina({ error, retry }: { error: unknown; retry: (
       </p>
       {digest && <p className="font-mono text-xs text-suave">Referencia: {digest}</p>}
       <div className="flex gap-3">
-        <button type="button" onClick={() => retry()} className="rounded-md bg-acento px-4 py-2 text-sm font-medium text-black">
+        <button type="button" onClick={() => retry()} className="btn-primario">
           Reintentar
         </button>
-        <Link href="/" className="rounded-md border border-borde px-4 py-2 text-sm">
+        <Link href="/" className="btn-secundario">
           Ir al inicio
         </Link>
       </div>

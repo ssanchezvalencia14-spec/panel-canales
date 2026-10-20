@@ -24,7 +24,7 @@ export function ActualizarDatos({ accion, actualizadoEn }: { accion: () => Promi
       <button
         type="submit"
         disabled={pendiente}
-        className="inline-flex items-center gap-2 rounded-full border border-borde px-3 py-1.5 hover:border-acento disabled:opacity-60"
+        className="btn-secundario px-3 py-1.5"
       >
         <span aria-hidden className={pendiente ? "animate-spin" : ""}>↻</span>
         {pendiente ? "Actualizando…" : "Actualizar ahora"}

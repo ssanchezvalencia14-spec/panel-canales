@@ -21,7 +21,7 @@ export function FiltroCanal({ canales, actual, ruta, extra = {} }: { canales: Ca
       <Link
         href={href(null)}
         aria-current={actual === null ? "true" : undefined}
-        className={`${base} ${actual === null ? "border-acento bg-acento font-semibold text-fondo" : "border-borde text-suave hover:border-acento hover:text-texto"}`}
+        className={`${base} ${actual === null ? "border-primario bg-primario font-semibold text-sobre-primario" : "border-borde-campo text-suave hover:border-primario hover:text-texto"}`}
       >
         Todos
       </Link>
@@ -33,7 +33,7 @@ export function FiltroCanal({ canales, actual, ruta, extra = {} }: { canales: Ca
             href={href(c.slug)}
             aria-current={activo ? "true" : undefined}
             style={activo && c.color ? { backgroundColor: c.color, borderColor: c.color, color: textoSobre(c.color) } : undefined}
-            className={`${base} ${activo ? "font-semibold" : "border-borde text-suave hover:border-acento hover:text-texto"}`}
+            className={`${base} ${activo ? "font-semibold" : "border-borde-campo text-suave hover:border-primario hover:text-texto"}`}
           >
             {c.color && !activo && <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color }} />}
             {c.nombre}

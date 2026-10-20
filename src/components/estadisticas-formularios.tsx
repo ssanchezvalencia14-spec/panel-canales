@@ -7,8 +7,8 @@ import type { ResultadoCsv } from "@/server/acciones/estadisticas";
 import { Aviso } from "./equipo-formularios";
 
 type Accion = (prev: Resultado, form: FormData) => Promise<Resultado>;
-const campo = "rounded-md border border-borde bg-fondo px-3 py-2 text-sm outline-none focus:border-acento";
-const boton = "rounded-md bg-acento px-3 py-2 text-sm font-semibold text-fondo disabled:opacity-60";
+const campo = "campo";
+const boton = "btn-primario";
 
 export function FormularioPublicacion({ accion }: { accion: Accion }) {
   const [r, enviar, pendiente] = useActionState(accion, null);
@@ -96,7 +96,7 @@ export function BotonAccion({
       <button
         type="submit"
         disabled={pendiente}
-        className={variante === "primario" ? boton : "rounded-md border border-borde px-3 py-2 text-sm hover:border-acento disabled:opacity-60"}
+        className={variante === "primario" ? boton : "btn-secundario"}
       >
         {pendiente ? pendienteTexto : texto}
       </button>
@@ -111,7 +111,7 @@ export function FormularioCalendario({ accion, actual }: { accion: Accion; actua
     <form action={enviar} className="space-y-2">
       <div className="flex flex-wrap gap-2">
         <input name="calendarioId" defaultValue={actual} aria-label="Id del calendario" className={`${campo} min-w-64 flex-1`} />
-        <button type="submit" disabled={pendiente} className="rounded-md border border-borde px-3 py-2 text-sm hover:border-acento">
+        <button type="submit" disabled={pendiente} className="btn-secundario">
           Guardar
         </button>
       </div>

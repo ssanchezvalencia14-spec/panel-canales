@@ -1,7 +1,8 @@
 // Sección de publicación en la ficha de un video (servidor).
 
 import { BotonAccion } from "./estadisticas-formularios";
-import { claseCampo, FormularioAccion } from "./formulario-accion";
+import { claseCampo } from "./clases";
+import { FormularioAccion } from "./formulario-accion";
 import { ConfirmarAccion, ParteTiktok } from "./confirmar-accion";
 import { ESTADOS_CON_APROBACION, type EstadoVideo } from "@/lib/dominio/estados";
 import { formatearFechaHora } from "@/lib/dominio/fechas";

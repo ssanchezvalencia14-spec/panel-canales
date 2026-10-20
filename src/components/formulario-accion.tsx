@@ -38,8 +38,8 @@ export function FormularioAccion({
           disabled={pendiente}
           className={
             variante === "primario"
-              ? "rounded-md bg-acento px-3 py-2 text-sm font-semibold text-fondo disabled:opacity-60"
-              : "rounded-md border border-borde px-3 py-2 text-sm hover:border-acento disabled:opacity-60"
+              ? "btn-primario"
+              : "btn-secundario"
           }
         >
           {pendiente ? textoPendiente : boton}
@@ -50,4 +50,3 @@ export function FormularioAccion({
   );
 }
 
-export const claseCampo = "w-full rounded-md border border-borde bg-fondo px-3 py-2 text-sm outline-none focus:border-acento";

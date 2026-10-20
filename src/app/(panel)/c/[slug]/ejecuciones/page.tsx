@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { claseCampo, FormularioAccion } from "@/components/formulario-accion";
+import { claseCampo } from "@/components/clases";
+import { FormularioAccion } from "@/components/formulario-accion";
 import { FormularioEjecucion, TablaEjecuciones } from "@/components/produccion-video";
 import { puede } from "@/lib/dominio/roles";
 import { prisma } from "@/server/db";

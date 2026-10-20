@@ -3,14 +3,20 @@
 /* Tema invisual: azul #1d44f9, lima #ccf02a, blanco y Poppins. El fondo es un
    azul muy oscuro derivado del azul de la marca para que las tablas y los
    gráficos se lean cómodos. El acento (--acento) es la lima; dentro de un
-   canal toma el color del canal. */
+   canal toma el color del canal. Las acciones principales usan siempre la lima
+   de la marca (--primario), sea cual sea el canal. */
 :root {
   --fondo: #0a1140;
   --superficie: #101a5c;
+  --superficie-alta: #16237a;
   --borde: #24339a;
+  /* Borde de campos y controles: ≥ 3:1 contra fondo y superficie (WCAG 1.4.11). */
+  --borde-campo: #5a6fe0;
   --texto: #ffffff;
   --texto-suave: #aab5ef;
   --acento: #ccf02a;
+  --primario: #ccf02a;
+  --sobre-primario: #0a1140;
   --azul: #1d44f9;
   color-scheme: dark;
 }
@@ -18,10 +24,14 @@
 @theme inline {
   --color-fondo: var(--fondo);
   --color-superficie: var(--superficie);
+  --color-superficie-alta: var(--superficie-alta);
   --color-borde: var(--borde);
+  --color-borde-campo: var(--borde-campo);
   --color-texto: var(--texto);
   --color-suave: var(--texto-suave);
   --color-acento: var(--acento);
+  --color-primario: var(--primario);
+  --color-sobre-primario: var(--sobre-primario);
   --color-azul: var(--azul);
   --font-sans: var(--font-poppins);
   --font-mono: var(--font-geist-mono);
@@ -41,4 +51,87 @@ body {
 :focus-visible {
   outline: 2px solid #ccf02a;
   outline-offset: 2px;
+}
+
+/* ───────────── Piezas de la interfaz ───────────── */
+
+/* Acción principal: lima de la marca con texto azul noche. */
+@utility btn-primario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  background-color: var(--primario);
+  color: var(--sobre-primario);
+  padding: 0.5rem 1.1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: filter 150ms, transform 150ms;
+  &:hover {
+    filter: brightness(1.06);
+  }
+  &:active {
+    transform: translateY(1px);
+  }
+  &:disabled,
+  &[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+/* Acción secundaria: contorno visible sobre el azul. */
+@utility btn-secundario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid var(--borde-campo);
+  color: var(--texto);
+  padding: 0.5rem 1.1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: border-color 150ms, background-color 150ms;
+  &:hover {
+    border-color: var(--primario);
+    background-color: var(--superficie-alta);
+  }
+  &:disabled,
+  &[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+/* Campos de formulario. */
+@utility campo {
+  border-radius: 0.6rem;
+  border: 1px solid var(--borde-campo);
+  background-color: var(--fondo);
+  color: var(--texto);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  outline: none;
+  &::placeholder {
+    color: color-mix(in oklab, var(--texto-suave) 80%, transparent);
+  }
+  &:focus {
+    border-color: var(--primario);
+    box-shadow: 0 0 0 1px var(--primario);
+  }
+}
+
+/* Tarjeta base. */
+@utility tarjeta {
+  border-radius: 1rem;
+  border: 1px solid var(--borde);
+  background-color: var(--superficie);
+  padding: 1.25rem;
 }

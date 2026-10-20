@@ -19,7 +19,7 @@ export function Aviso({ resultado }: { resultado: Resultado }) {
   );
 }
 
-const campo = "rounded-md border border-borde bg-fondo px-3 py-2 text-sm outline-none focus:border-acento";
+const campo = "campo";
 
 export function FormularioAgregarMiembro({ accion }: { accion: Accion }) {
   const [resultado, enviar, pendiente] = useActionState(accion, null);
@@ -40,7 +40,7 @@ export function FormularioAgregarMiembro({ accion }: { accion: Accion }) {
         <button
           type="submit"
           disabled={pendiente}
-          className="rounded-md bg-acento px-3 py-2 text-sm font-semibold text-fondo disabled:opacity-60"
+          className="btn-primario"
         >
           {pendiente ? "Guardando…" : "Agregar"}
         </button>
@@ -70,7 +70,7 @@ export function ControlesMiembro({
           name="rol"
           defaultValue={rol}
           aria-label="Rol"
-          className="rounded-md border border-borde bg-fondo px-2 py-1 text-sm"
+          className="campo py-1"
           onChange={(e) => e.currentTarget.form?.requestSubmit()}
           disabled={cambiando}
         >
@@ -90,7 +90,7 @@ export function ControlesMiembro({
         <button
           type="submit"
           disabled={quitando}
-          className="rounded-md border border-borde px-2 py-1 text-sm text-suave hover:border-red-800 hover:text-red-300"
+          className="btn-secundario px-3 py-1 text-suave hover:border-red-400 hover:text-red-200"
         >
           Quitar
         </button>

@@ -1,7 +1,8 @@
 // Sección de producción asistida en la ficha de un video (servidor).
 
 import { BotonAccion } from "./estadisticas-formularios";
-import { claseCampo, FormularioAccion } from "./formulario-accion";
+import { claseCampo } from "./clases";
+import { FormularioAccion } from "./formulario-accion";
 import { NOMBRE_ESTADO, ESTADOS_VIDEO, type EstadoVideo } from "@/lib/dominio/estados";
 import { NOMBRE_PROPIEDAD, type Propiedad, type PuntajeGancho } from "@/lib/puntaje/gancho";
 import type { RevisionTitulo } from "@/lib/puntaje/titulo";
@@ -530,16 +531,16 @@ export function TablaEjecuciones({
                 )}
                 {edita && e.tipo !== "guion_ia" && e.tipo !== "sincronizacion_google" && (e.estado === "en_cola" || e.estado === "en_curso") && (
                   <FormularioAccion accion={actualizarEjecucionAccion.bind(null, slug, e.id)} boton="Actualizar" variante="secundario" className="mt-1 flex flex-wrap items-end gap-1">
-                    <select name="estado" defaultValue="ok" aria-label="Nuevo estado" className="rounded-md border border-borde bg-fondo px-2 py-1 text-xs">
+                    <select name="estado" defaultValue="ok" aria-label="Nuevo estado" className="campo px-2 py-1">
                       {Object.entries(ESTADO_EJ).map(([k, t]) => (
                         <option key={k} value={k}>
                           {t}
                         </option>
                       ))}
                     </select>
-                    <input name="costo" type="number" min="0" step="0.0001" placeholder="costo" aria-label="Costo" className="w-24 rounded-md border border-borde bg-fondo px-2 py-1 text-xs" />
-                    <input name="salidaUrl" type="url" placeholder="enlace" aria-label="Enlace de salida" className="w-40 rounded-md border border-borde bg-fondo px-2 py-1 text-xs" />
-                    <input name="nota" placeholder="nota" aria-label="Nota" className="w-32 rounded-md border border-borde bg-fondo px-2 py-1 text-xs" />
+                    <input name="costo" type="number" min="0" step="0.0001" placeholder="costo" aria-label="Costo" className="w-24 campo px-2 py-1" />
+                    <input name="salidaUrl" type="url" placeholder="enlace" aria-label="Enlace de salida" className="w-40 campo px-2 py-1" />
+                    <input name="nota" placeholder="nota" aria-label="Nota" className="w-32 campo px-2 py-1" />
                   </FormularioAccion>
                 )}
               </td>

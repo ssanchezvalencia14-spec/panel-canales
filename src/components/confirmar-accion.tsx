@@ -54,7 +54,7 @@ export function ConfirmarAccion({
         <button
           type="submit"
           disabled={!acepta || enCurso || deshabilitado}
-          className="rounded-md bg-acento px-3 py-2 text-sm font-semibold text-fondo disabled:opacity-40"
+          className="btn-primario"
         >
           {enCurso ? pendiente : boton}
         </button>
@@ -75,7 +75,7 @@ export function Copiar({ texto }: { texto: string }) {
         setHecho(true);
         setTimeout(() => setHecho(false), 1500);
       }}
-      className="rounded-md border border-borde px-2 py-1 text-xs hover:border-acento"
+      className="btn-secundario px-2.5 py-1 text-xs"
     >
       {hecho ? "Copiado" : "Copiar"}
     </button>

@@ -19,7 +19,7 @@ const DIAS = [
   ["dom", "Dom"],
 ] as const;
 
-const campo = "w-full rounded-md border border-borde bg-fondo px-3 py-2 text-sm outline-none focus:border-acento";
+const campo = "campo w-full";
 const etiqueta = "block text-sm font-medium";
 const ayuda = "mt-1 text-xs text-suave";
 
@@ -115,7 +115,7 @@ export function FormularioCanal({ accion, zonas }: Props) {
         <button
           type="submit"
           disabled={pendiente}
-          className="rounded-md bg-acento px-4 py-2 text-sm font-semibold text-fondo disabled:opacity-60"
+          className="btn-primario"
         >
           {pendiente ? "Creando…" : "Crear canal"}
         </button>

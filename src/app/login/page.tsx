@@ -52,11 +52,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             type="email"
             required
             autoComplete="email"
-            className="w-full rounded-md border border-borde bg-fondo px-3 py-2 text-sm outline-none focus:border-acento"
+            className="campo w-full"
           />
           <button
             type="submit"
-            className="w-full rounded-md bg-acento px-3 py-2 text-sm font-semibold text-fondo hover:opacity-90"
+            className="btn-primario w-full"
           >
             Enviar enlace
           </button>
