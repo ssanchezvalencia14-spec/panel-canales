@@ -38,6 +38,12 @@ export function FormularioEnlace({ accion, slug, etiqueta = "Agregar canal", com
           {pendiente ? "Leyendo canal…" : etiqueta}
         </button>
       </div>
+      {!slug && (
+        <label className="flex items-start gap-2 pt-1 text-sm text-suave">
+          <input type="checkbox" name="equipo" value="si" defaultChecked className="mt-0.5 h-4 w-4 accent-[var(--primario)]" />
+          <span>Dar acceso al equipo actual (cada persona con el rol que tiene en los demás canales).</span>
+        </label>
+      )}
       {resultado?.error && (
         <p role="alert" className="text-sm text-red-300">
           {resultado.error}

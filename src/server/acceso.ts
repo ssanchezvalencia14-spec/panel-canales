@@ -250,6 +250,13 @@ export async function crearCanal(db: Db, usuario: UsuarioSesion, config: ConfigC
 
 // ─────────────────────────── Equipo del canal ───────────────────────────
 
+/** Cuántas personas tienen rol en cada canal (vista de canales del superadmin). */
+export async function contarMiembrosPorCanal(db: Db, usuario: UsuarioSesion): Promise<Map<string, number>> {
+  if (!puedeAdministrarRed(usuario)) throw new AccesoDenegado("Solo un superadmin de red ve el equipo de todos los canales.");
+  const grupos = await db.membresia.groupBy({ by: ["canalId"], where: { user: { activo: true } }, _count: { _all: true } });
+  return new Map(grupos.map((g) => [g.canalId, g._count._all]));
+}
+
 export async function listarMiembros(db: Db, usuario: UsuarioSesion, canalId: string) {
   if (!puede(usuario, canalId, "ver")) throw new AccesoDenegado();
   return db.membresia.findMany({

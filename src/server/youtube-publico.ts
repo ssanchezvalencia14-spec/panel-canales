@@ -8,7 +8,8 @@ import { diasProduccion, mesVecino, sumarDias } from "@/lib/dominio/calendario";
 import { construirMesGlobal, type DiaGlobal } from "@/lib/dominio/calendario-global";
 import { colorSeguro } from "@/lib/dominio/canal-config";
 import { fechaLocal } from "@/lib/dominio/fechas";
-import { puedeAdministrarRed } from "@/lib/dominio/roles";
+import { rolParaCanalNuevo } from "@/lib/dominio/equipo";
+import { puedeAdministrarRed, type Rol } from "@/lib/dominio/roles";
 import { log } from "@/lib/log";
 import { acentoPanel } from "@/lib/panel";
 import { configDeCanalPublico } from "@/lib/youtube/canal-nuevo";
@@ -139,11 +140,32 @@ export async function actualizarCanalesVisibles(db: Db, usuario: UsuarioSesion, 
  * que ya existe en el panel, le asocia el enlace; si no, crea un canal nuevo.
  * Solo el superadmin de red.
  */
+/**
+ * Da acceso a un canal recién creado al equipo actual de la red: cada persona
+ * activa con algún rol recibe el rol que más tiene (con empate, el de menos
+ * permisos). Sin esto, solo el superadmin vería el canal nuevo.
+ */
+export async function darAccesoAlEquipo(db: Db, canalId: string): Promise<number> {
+  const membresias = await db.membresia.findMany({
+    where: { canalId: { not: canalId }, user: { activo: true, esSuperadmin: false } },
+    select: { userId: true, rol: true },
+  });
+  const porPersona = new Map<string, Rol[]>();
+  for (const m of membresias) porPersona.set(m.userId, [...(porPersona.get(m.userId) ?? []), m.rol]);
+  const data = [...porPersona.entries()].flatMap(([userId, roles]) => {
+    const rol = rolParaCanalNuevo(roles);
+    return rol ? [{ userId, canalId, rol }] : [];
+  });
+  if (data.length === 0) return 0;
+  const { count } = await db.membresia.createMany({ data, skipDuplicates: true });
+  return count;
+}
+
 export async function vincularCanalPorEnlace(
   db: Db,
   usuario: UsuarioSesion,
   enlace: string,
-  opciones: { canalSlug?: string } = {},
+  opciones: { canalSlug?: string; darAccesoEquipo?: boolean } = {},
   deps: Deps = {},
 ) {
   if (!puedeAdministrarRed(usuario)) throw new AccesoDenegado("Solo un superadmin de red puede vincular canales.");
@@ -157,6 +179,7 @@ export async function vincularCanalPorEnlace(
   let canalId: string;
   let slug: string;
   let nombre: string;
+  let equipo = 0;
   if (opciones.canalSlug) {
     const existente = await db.canal.findUnique({ where: { slug: opciones.canalSlug }, select: { id: true, slug: true, nombre: true, youtubeCanalId: true } });
     if (!existente) throw new NoEncontrado("Canal no encontrado.");
@@ -169,11 +192,12 @@ export async function vincularCanalPorEnlace(
     const creado = await insertarCanal(db, config);
     await db.canal.update({ where: { id: creado.id }, data: vinculo });
     ({ id: canalId, slug, nombre } = creado);
+    if (opciones.darAccesoEquipo !== false) equipo = await darAccesoAlEquipo(db, canalId);
   }
 
   // Primera lectura con más historial; si falla (p. ej. cuota), el canal queda creado igual.
   const sync = await sincronizarCanalPublico(db, canalId, { ...deps, yt, videosMax: 100 });
-  return { canalId, slug, nombre, sync };
+  return { canalId, slug, nombre, sync, equipo };
 }
 
 // ─────────────────────────── Consultas globales ───────────────────────────

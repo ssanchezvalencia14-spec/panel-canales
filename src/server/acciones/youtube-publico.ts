@@ -15,7 +15,12 @@ export async function vincularCanalAccion(_prev: Resultado, form: FormData): Pro
     const enlace = String(form.get("enlace") ?? "").trim();
     if (!enlace) return { error: "Pega el enlace del canal." };
     const slugExistente = String(form.get("slug") ?? "").trim();
-    const r = await vincularCanalPorEnlace(prisma, usuario, enlace, slugExistente ? { canalSlug: slugExistente } : {});
+    const r = await vincularCanalPorEnlace(
+      prisma,
+      usuario,
+      enlace,
+      slugExistente ? { canalSlug: slugExistente } : { darAccesoEquipo: form.get("equipo") === "si" },
+    );
     destino = `/estadisticas?canal=${encodeURIComponent(r.slug)}`;
   } catch (e) {
     return aResultado(e);
