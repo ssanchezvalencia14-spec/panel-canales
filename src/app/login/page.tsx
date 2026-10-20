@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { auth, signIn } from "@/auth";
+import { LogoInvisual } from "@/components/logo-invisual";
 import { nombrePanel } from "@/lib/panel";
 
 async function pedirEnlace(formData: FormData) {
@@ -35,17 +36,18 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-xl border border-borde bg-superficie p-8">
+      <div className="w-full max-w-sm rounded-2xl border border-borde bg-superficie p-8 shadow-2xl shadow-black/30">
+        <LogoInvisual className="mb-6 h-10 w-auto text-texto" titulo="invisual" />
         <p className="text-sm text-suave">{nombrePanel()}</p>
         <h1 className="mt-1 text-xl font-semibold">Entrar</h1>
         <p className="mt-2 text-sm text-suave">Te enviamos un enlace de acceso a tu correo.</p>
         {mensaje && (
-          <p role="alert" className="mt-4 rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-sm text-red-200">
+          <p role="alert" className="mt-4 rounded-xl border border-red-400/60 bg-red-950/60 px-3 py-2 text-sm text-red-100">
             {mensaje}
           </p>
         )}
         <form action={pedirEnlace} className="mt-6 space-y-3">
-          <label htmlFor="email" className="block text-sm">Correo</label>
+          <label htmlFor="email" className="block text-sm font-medium">Correo</label>
           <input
             id="email"
             name="email"
