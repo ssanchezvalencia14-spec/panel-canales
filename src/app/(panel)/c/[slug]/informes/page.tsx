@@ -40,7 +40,7 @@ export default async function Informes({ params }: PageProps<"/c/[slug]/informes
 
   return (
     <section className="space-y-6">
-      <div className="rounded-lg border border-borde bg-superficie p-4">
+      <div className="rounded-2xl border border-borde bg-superficie p-4 sm:p-5">
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <h2 className="font-semibold">Alertas</h2>
           <span className="text-xs text-suave">{abiertas.length} abierta(s)</span>
@@ -82,7 +82,7 @@ export default async function Informes({ params }: PageProps<"/c/[slug]/informes
         <p className="mt-3 text-xs text-suave">El cron diario revisa las alertas y avisa por correo a los admins de las nuevas.</p>
       </div>
 
-      <div className="rounded-lg border border-borde bg-superficie p-4">
+      <div className="rounded-2xl border border-borde bg-superficie p-4 sm:p-5">
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <h2 className="font-semibold">Resumen semanal</h2>
           {admin && (
@@ -111,7 +111,7 @@ export default async function Informes({ params }: PageProps<"/c/[slug]/informes
         )}
       </div>
 
-      <div className="rounded-lg border border-borde bg-superficie p-4">
+      <div className="rounded-2xl border border-borde bg-superficie p-4 sm:p-5">
         <h2 className="mb-1 font-semibold">Investigación de referencias</h2>
         <p className="mb-3 text-xs text-suave">
           Un informe semanal con referencias y tendencias del nicho, siempre con enlaces. vidIQ no tiene API para el panel: lo que exportes de vidIQ
@@ -144,7 +144,7 @@ export default async function Informes({ params }: PageProps<"/c/[slug]/informes
         )}
       </div>
 
-      <div className="rounded-lg border border-borde">
+      <div className="overflow-hidden rounded-2xl border border-borde">
         <h2 className="border-b border-borde bg-superficie px-3 py-2 font-semibold">Informes</h2>
         {informes.length === 0 ? (
           <p className="p-3 text-sm text-suave">Todavía no hay informes.</p>
